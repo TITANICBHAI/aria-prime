@@ -170,7 +170,7 @@ target_include_directories(llama-jni PRIVATE
 # already listed in target_include_directories above.
 target_link_libraries(llama-jni
     llama           # llama.cpp core
-    common          # llama.cpp common utilities
+    llama-common    # llama.cpp common utilities (renamed from 'common' in b6800+)
     mtmd            # multimodal: CLIP image encoder + projection layer
     ${LOG_LIB}      # __android_log_print
 )
