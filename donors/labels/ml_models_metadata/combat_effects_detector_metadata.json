@@ -1,0 +1,22 @@
+{
+  "name": "Combat Effects Detector",
+  "version": "1.0.0",
+  "description": "Detects combat effects and visual indicators in games",
+  "author": "AI Gaming Assistant",
+  "input_shape": [1, 224, 224, 3],
+  "input_type": "float32",
+  "output_shape": [1, 80],
+  "output_type": "float32",
+  "labels_file": "labels/combat_effects_extended.txt",
+  "minimum_confidence": 0.65,
+  "input_normalization": {
+    "mean": [127.5, 127.5, 127.5],
+    "std": [127.5, 127.5, 127.5]
+  },
+  "performance_metrics": {
+    "inference_time_avg_ms": 38,
+    "precision": 0.87,
+    "recall": 0.82,
+    "supported_accelerators": ["CPU", "GPU"]
+  }
+}

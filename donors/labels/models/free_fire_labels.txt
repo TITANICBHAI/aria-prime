@@ -1,0 +1,10 @@
+enemy
+weapon_m4a1
+weapon_scar
+vehicle_jeep
+vehicle_bike
+helmet
+vest
+ammo
+medkit
+grenade

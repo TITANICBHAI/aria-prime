@@ -1,0 +1,14 @@
+player
+vehicle
+weapon_ar
+weapon_smg
+weapon_sniper
+weapon_shotgun
+weapon_pistol
+scorestreak
+health
+armor
+attachment
+objective
+safezone
+danger_zone

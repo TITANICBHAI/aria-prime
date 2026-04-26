@@ -1,0 +1,67 @@
+{
+  "models": [
+    {
+      "name": "threat_detection_model",
+      "version": "1.0.0",
+      "description": "ML model for detecting security threats and monitoring attempts",
+      "input_shape": [1, 100],
+      "output_shape": [1, 7],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "depth_estimation_model",
+      "version": "1.0.0",
+      "description": "Model for estimating depth from 2D images",
+      "input_shape": [1, 224, 224, 3],
+      "output_shape": [1, 224, 224, 1],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "object_detection_model",
+      "version": "1.0.0",
+      "description": "Model for detecting objects in images",
+      "input_shape": [1, 224, 224, 3],
+      "output_shape": [1, 10, 4],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "spatial_reasoning_model",
+      "version": "1.0.0",
+      "description": "Model for spatial reasoning and relationship analysis",
+      "input_shape": [1, 100],
+      "output_shape": [1, 20],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "voice_biometric_model",
+      "version": "1.0.0",
+      "description": "Model for voice biometric authentication",
+      "input_shape": [1, 16000],
+      "output_shape": [1, 128],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "synthetic_voice_model",
+      "version": "1.0.0",
+      "description": "Model for detecting synthetic voices",
+      "input_shape": [1, 16000],
+      "output_shape": [1, 2],
+      "input_type": "float32",
+      "output_type": "float32"
+    },
+    {
+      "name": "behavioral_voice_model",
+      "version": "1.0.0",
+      "description": "Model for analyzing behavioral patterns in voice",
+      "input_shape": [1, 16000],
+      "output_shape": [1, 10],
+      "input_type": "float32",
+      "output_type": "float32"
+    }
+  ]
+}

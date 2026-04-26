@@ -1,0 +1,32 @@
+# Build outputs
+build/
+.gradle/
+.idea/
+*.iml
+local.properties
+captures/
+
+# Native build
+android/app/.cxx/
+android/app/src/main/cpp/llama.cpp/
+
+# IDE
+.vscode/
+.idx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (large; downloaded at runtime)
+*.gguf
+*.tflite
+android/app/src/main/assets/models/*.gguf
+android/app/src/main/assets/models/*.tflite
+
+# LoRA adapters (generated)
+android/app/src/main/files/rl/
+
+# Keystore
+*.jks
+*.keystore

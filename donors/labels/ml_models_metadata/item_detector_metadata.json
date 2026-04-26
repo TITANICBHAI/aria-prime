@@ -1,0 +1,22 @@
+{
+  "name": "Item Detector",
+  "version": "1.0.0",
+  "description": "Detects and classifies items, weapons, equipment in games",
+  "author": "AI Gaming Assistant",
+  "input_shape": [1, 224, 224, 3],
+  "input_type": "float32",
+  "output_shape": [100, 6],
+  "output_type": "float32",
+  "labels_file": "labels/item_types_extended.txt",
+  "minimum_confidence": 0.6,
+  "input_normalization": {
+    "mean": [127.5, 127.5, 127.5],
+    "std": [127.5, 127.5, 127.5]
+  },
+  "performance_metrics": {
+    "inference_time_avg_ms": 48,
+    "precision": 0.86,
+    "recall": 0.83,
+    "supported_accelerators": ["CPU", "GPU"]
+  }
+}

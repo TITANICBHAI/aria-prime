@@ -1,0 +1,10 @@
+enemy
+weapon_m4
+weapon_ak47
+scorestreak
+uav
+helicopter
+medkit
+ammo
+grenade
+flashbang

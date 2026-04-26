@@ -1,0 +1,22 @@
+{
+  "name": "Environment Detector",
+  "version": "1.0.0",
+  "description": "Analyzes game environments, weather, and lighting conditions",
+  "author": "AI Gaming Assistant",
+  "input_shape": [1, 224, 224, 3],
+  "input_type": "float32",
+  "output_shape": [1, 128],
+  "output_type": "float32",
+  "labels_file": "labels/environment_types_extended.txt",
+  "minimum_confidence": 0.7,
+  "input_normalization": {
+    "mean": [127.5, 127.5, 127.5],
+    "std": [127.5, 127.5, 127.5]
+  },
+  "performance_metrics": {
+    "inference_time_avg_ms": 35,
+    "precision": 0.91,
+    "recall": 0.88,
+    "supported_accelerators": ["CPU", "GPU"]
+  }
+}

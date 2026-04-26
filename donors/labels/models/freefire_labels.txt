@@ -1,0 +1,14 @@
+player
+vehicle
+weapon_ar
+weapon_smg
+weapon_sniper
+weapon_shotgun
+weapon_pistol
+medkit
+armor
+scope
+attachment
+airdrop
+safezone
+danger_zone

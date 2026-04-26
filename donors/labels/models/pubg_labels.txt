@@ -1,0 +1,10 @@
+enemy
+weapon_m416
+weapon_akm
+vehicle_uaz
+vehicle_dacia
+helmet_level3
+vest_level3
+ammo_556
+ammo_762
+medkit

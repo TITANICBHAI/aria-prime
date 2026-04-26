@@ -1,0 +1,44 @@
+
+person
+weapon
+vehicle
+building
+tree
+rock
+door
+window
+stairs
+water
+shield
+armor
+health pack
+ammo
+map
+minimap
+scoreboard
+inventory
+crosshair
+radar
+compass
+waypoint
+objective marker
+damage indicator
+kill feed
+experience points
+power-up
+collectible
+button
+menu
+dialog
+slider
+progress bar
+text box
+checkbox
+dropdown
+tooltip
+notification
+timer
+status bar
+icon
+banner
+loading screen
