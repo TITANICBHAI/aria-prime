@@ -54,7 +54,7 @@ Pseudo-code, to be expanded in a follow-up port:
 ```kotlin
 val orchestrator = CentralOrchestrator(
     context = appContext,
-    problemSolver = LlamaProblemSolver(llamaEngine),  // TODO: implement
+    problemSolver = LlamaProblemSolver(),  // wraps LlamaEngine.infer()
 )
 
 // Bridge orchestration events onto the spine's UI-facing AgentEventBus
@@ -78,7 +78,10 @@ scope.launch { orchestrator.start() }
 
 ## Open follow-ups
 
-- Implement `LlamaProblemSolver` adapter that calls `LlamaEngine.infer()`.
+- ~~Implement `LlamaProblemSolver` adapter that calls `LlamaEngine.infer()`.~~
+  **Done** — `core/ai/LlamaProblemSolver.kt`. Defaults to `maxTokens=256`,
+  `temperature=0.3` (conservative diagnostics). Throws when the model is not
+  loaded so the broker escalates the ticket honestly.
 - Implement a real `OrchestrationScheduler.StageExecutor` that resolves
   `componentId` → `ComponentInterface` and invokes `execute()`.
 - Bridge `EventRouter` ↔ `AgentEventBus` so orchestration health events show

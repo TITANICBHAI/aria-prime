@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"port: orchestration layer (14 files, ~1965 LOC) from AII donor to Kotlin under core/orchestration/ — closes AGENT_INSTRUCTIONS gap #3. CentralOrchestrator is now a plain coroutine class (no Service); ProblemSolvingBroker takes a pluggable ProblemSolver (Groq dependency dropped); OrchestrationScheduler stage execution is pluggable (FeedbackSystem/ErrorResolutionWorkflow deps dropped); CircuitBreaker package typo fixed. Updated DONOR_INVENTORY, ARCHITECTURE, AGENT_INSTRUCTIONS, replit.md.\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"feat(orchestration): add LlamaProblemSolver adapter — closes follow-up (a) of orchestration gap. Wraps on-device LlamaEngine.infer() with conservative diagnostic defaults (maxTokens=256, temperature=0.3); throws when model not loaded so ProblemSolvingBroker escalates the ticket honestly. Updated orchestration README, AGENT_INSTRUCTIONS gap table, replit.md.\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000
