@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"fix(ci): bump pinned llama.cpp tag from b4870 to b6000. The previous pin failed assertion tools/mtmd missing because b4870 predates the introduction of the mtmd multimodal subdirectory in llama.cpp. Verified b6000 contains tools/mtmd which CMakeLists.txt line 123 requires (add_subdirectory mtmd_build) and llama_jni.cpp depends on (mtmd.h, mtmd-helper.h, mtmd_init_from_file, mtmd_helper_eval_chunks).\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"fix(cmake): set LLAMA_CURL OFF in android/app/src/main/cpp/CMakeLists.txt. llama.cpp's common/CMakeLists.txt line 85 aborts the configure step with 'Could NOT find CURL' when LLAMA_CURL is on (default), because the NDK toolchain has no libcurl. We do not need HTTP model fetching on Android (models are sideloaded), so this option is purely vestigial here. Configure step previously got past CMake error CXX1429 caused by missing tools/mtmd; this is the next blocker. CPU/Vulkan/OpenCL backends already configured cleanly per CI log lines 581-647.\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000

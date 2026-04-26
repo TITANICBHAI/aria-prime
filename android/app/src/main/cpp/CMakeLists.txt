@@ -57,6 +57,12 @@ set(GGML_OPENCL_USE_ADRENO_KERNELS OFF CACHE BOOL "Adreno-specific matmul kernel
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+# LLAMA_CURL gates HTTP-based model fetching in llama.cpp/common (libcurl).
+# Android does not need this — models are sideloaded from app storage — and
+# pulling libcurl into the NDK build would force us to vendor or cross-compile
+# it. Disable explicitly so common/CMakeLists.txt:85 does not abort with
+# "Could NOT find CURL".
+set(LLAMA_CURL OFF CACHE BOOL "No HTTP model download on Android" FORCE)
 # LLAMA_BUILD_COMMON defaults to LLAMA_STANDALONE, which is OFF when llama.cpp
 # is consumed via add_subdirectory (not a top-level build). Force it ON so the
 # 'common' CMake target is always produced and can be linked by llama-jni.
