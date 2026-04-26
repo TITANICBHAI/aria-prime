@@ -24,19 +24,24 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # ── 1b. Vendor llama.cpp at the pinned release tag ───────────────────────
-      # Pinned to b4870 (matches docs/07_BUILD_AND_INSTALL.md). A shallow clone
-      # of a single tag is fast (<10s) and keeps CI deterministic across reruns.
-      # Skipped if the directory already exists (e.g. when a future commit
-      # genuinely vendors or submodules llama.cpp).
-      - name: Vendor llama.cpp @ b4870
+      # ── 1b. Vendor llama.cpp at a pinned release tag ─────────────────────────
+      # Pinned to b6000 — first stable release tag (verified) that contains both
+      # the core llama target and the tools/mtmd multimodal subdirectory that
+      # llama_jni.cpp depends on (#include "mtmd.h", "mtmd-helper.h"). The older
+      # b4870 referenced in docs/07_BUILD_AND_INSTALL.md predates tools/mtmd and
+      # cannot satisfy android/app/src/main/cpp/CMakeLists.txt:123
+      #   add_subdirectory(${LLAMA_DIR}/tools/mtmd mtmd_build)
+      # A shallow clone of a single tag finishes in <10s and keeps CI
+      # deterministic across reruns. Skipped if the directory is already vendored.
+      - name: Vendor llama.cpp @ b6000
         run: |
           LLAMA_DIR="android/app/src/main/cpp/llama.cpp"
+          LLAMA_TAG="b6000"
           if [ -d "$LLAMA_DIR/.git" ] || [ -f "$LLAMA_DIR/CMakeLists.txt" ]; then
             echo "[llama.cpp] already present at $LLAMA_DIR — skipping clone"
           else
-            echo "[llama.cpp] cloning b4870 into $LLAMA_DIR"
-            git clone --depth=1 --branch b4870 \
+            echo "[llama.cpp] cloning $LLAMA_TAG into $LLAMA_DIR"
+            git clone --depth=1 --branch "$LLAMA_TAG" \
               https://github.com/ggerganov/llama.cpp.git "$LLAMA_DIR"
             # Drop the .git directory so the cache key (which hashes cpp/**)
             # stays stable across runs and so Gradle does not try to track it.
