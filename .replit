@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"fix(orchestration): add explicit ': Unit' return type to 4 single-expression suspend functions wrapping stateMutex.withLock { ... } in CentralOrchestrator.{initialize,stop} and OrchestrationScheduler.{start,stop}. Without it, Kotlin inferred the return type as Int because the last lambda expression was Log.i(...) — Android's android.util.Log methods return Int (bytes written). The bare 'return' statements inside then failed compileDebugKotlin with: 'Return type mismatch: expected kotlin.Int, actual kotlin.Unit'. Fixes 4 errors at CentralOrchestrator.kt:73,123 and OrchestrationScheduler.kt:61,78.\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"fix(ci): vendor llama.cpp @ b4870 in build-android.yml. Root cause of CMake failure 'add_subdirectory given source .../cpp/llama.cpp which is not an existing directory': .gitmodules is empty in the repo, so 'submodules: recursive' in the checkout step is a no-op. Added a new step 'Vendor llama.cpp @ b4870' that shallow-clones the pinned release tag (matches docs/07_BUILD_AND_INSTALL.md) into android/app/src/main/cpp/llama.cpp before any Gradle/CMake task, and asserts both CMakeLists.txt and tools/mtmd/ exist. The .git directory is removed post-clone so the .cxx cache key (hashes cpp/**) stays stable.\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000

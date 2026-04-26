@@ -14,14 +14,38 @@ jobs:
 
     steps:
       # ── 1. Checkout with submodules ──────────────────────────────────────────
-      # llama.cpp lives at android/app/src/main/cpp/llama.cpp as a submodule.
-      # Without --recurse-submodules the NDK build fails immediately at
-      # add_subdirectory(${LLAMA_DIR} llama_build).
+      # llama.cpp lives at android/app/src/main/cpp/llama.cpp.
+      # Historically intended as a submodule but the .gitmodules entry was never
+      # committed, so `submodules: recursive` is a no-op and step 1b below is what
+      # actually puts the vendor source in place.
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
+
+      # ── 1b. Vendor llama.cpp at the pinned release tag ───────────────────────
+      # Pinned to b4870 (matches docs/07_BUILD_AND_INSTALL.md). A shallow clone
+      # of a single tag is fast (<10s) and keeps CI deterministic across reruns.
+      # Skipped if the directory already exists (e.g. when a future commit
+      # genuinely vendors or submodules llama.cpp).
+      - name: Vendor llama.cpp @ b4870
+        run: |
+          LLAMA_DIR="android/app/src/main/cpp/llama.cpp"
+          if [ -d "$LLAMA_DIR/.git" ] || [ -f "$LLAMA_DIR/CMakeLists.txt" ]; then
+            echo "[llama.cpp] already present at $LLAMA_DIR — skipping clone"
+          else
+            echo "[llama.cpp] cloning b4870 into $LLAMA_DIR"
+            git clone --depth=1 --branch b4870 \
+              https://github.com/ggerganov/llama.cpp.git "$LLAMA_DIR"
+            # Drop the .git directory so the cache key (which hashes cpp/**)
+            # stays stable across runs and so Gradle does not try to track it.
+            rm -rf "$LLAMA_DIR/.git"
+          fi
+          echo "[llama.cpp] HEAD layout:"
+          ls "$LLAMA_DIR" | head -20
+          test -f "$LLAMA_DIR/CMakeLists.txt" || { echo "ERROR: llama.cpp CMakeLists.txt missing" >&2; exit 1; }
+          test -d "$LLAMA_DIR/tools/mtmd"     || { echo "ERROR: llama.cpp tools/mtmd missing" >&2; exit 1; }
 
       # ── 2. JDK 17 ─────────────────────────────────────────────────────────────
       - name: Set up JDK 17
