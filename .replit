@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"fix(ci): bump pinned llama.cpp tag from b6000 to b8935. The previous b6000 NDK build progressed through CMake configure (CPU, Vulkan, OpenCL all OK) and into the actual compile step, but llama_jni.cpp uses several APIs that did not exist yet at b6000: llama_context_params.flash_attn_type, LLAMA_FLASH_ATTN_TYPE_AUTO/DISABLED, llama_set_adapters_lora, mtmd_context_params.flash_attn_type/warmup, llama_opt_params.optimizer_type, GGML_OPT_OPTIMIZER_TYPE_ADAMW. Verified against tag b8935 raw headers (include/llama.h, ggml/include/ggml-opt.h) that all symbols are present. b8500 also works; chose b8935 (latest stable) to track upstream bugfixes.\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"fix(vulkan): install spirv-headers apt package and stage /usr/include/spirv into build-local include dir for NDK cross-compile. The b8935 ggml-vulkan.cpp:28 includes 'spirv/unified1/spirv.hpp' (KhronosGroup/SPIRV-Headers C++ enum wrappers), which apt's spirv-headers ships at /usr/include/spirv/. NDK clang's --sysroot points at the Android NDK sysroot and ignores /usr/include, so installing the package is necessary but not sufficient — we also stage the headers under CMAKE_BINARY_DIR/spirv_include and add it via include_directories(BEFORE ...) (plain -I, not -isystem) so user-include search order beats the sysroot. Mirrors the existing vulkan.hpp staging pattern. Without this Vulkan backend cannot compile (CPU + OpenCL still would).\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000

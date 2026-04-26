@@ -101,6 +101,21 @@ if(ANDROID)
              DESTINATION "${CMAKE_BINARY_DIR}/vulkan_hpp_include/vulkan"
              FILES_MATCHING PATTERN "*.hpp")
         include_directories(BEFORE "${CMAKE_BINARY_DIR}/vulkan_hpp_include")
+
+        # Stage SPIRV-Headers (the unified1 C++ enum wrappers) the same way.
+        # ggml-vulkan.cpp:28 includes "spirv/unified1/spirv.hpp", which lives in
+        # the apt 'spirv-headers' package at /usr/include/spirv/. Like vulkan.hpp,
+        # it is header-only and architecture-independent, so the host copy is
+        # safe for cross-compile. Without it the NDK build aborts with:
+        #   fatal error: 'spirv/unified1/spirv.hpp' file not found
+        if(EXISTS "/usr/include/spirv/unified1/spirv.hpp")
+            message(STATUS "[ARIA] spirv-headers found — staging into build-local directory")
+            file(COPY "/usr/include/spirv/"
+                 DESTINATION "${CMAKE_BINARY_DIR}/spirv_include/spirv")
+            include_directories(BEFORE "${CMAKE_BINARY_DIR}/spirv_include")
+        else()
+            message(WARNING "[ARIA] spirv/unified1/spirv.hpp not found on host — Vulkan backend will fail to compile; run: sudo apt-get install -y spirv-headers")
+        endif()
     else()
         message(WARNING "[ARIA] vulkan/vulkan.hpp not found on host — disabling Vulkan backend; run: sudo apt-get install -y libvulkan-dev")
         set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
