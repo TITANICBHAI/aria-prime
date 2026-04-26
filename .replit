@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"feat(orchestration): add LlamaProblemSolver adapter — closes follow-up (a) of orchestration gap. Wraps on-device LlamaEngine.infer() with conservative diagnostic defaults (maxTokens=256, temperature=0.3); throws when model not loaded so ProblemSolvingBroker escalates the ticket honestly. Updated orchestration README, AGENT_INSTRUCTIONS gap table, replit.md.\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"docs: add FLAWS.md — verified runtime/flow audit (8 alleged flaws → 2 REAL, 3 PARTIAL, 3 HYPOTHETICAL) with file/line evidence and real-life trigger situations. Counters speculative claims about node-registry leaks, long-press retry logic, and OpenCL OOM. Identifies the genuine fixes (orchestration wiring, watchdog race in AgentForegroundService).\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000
