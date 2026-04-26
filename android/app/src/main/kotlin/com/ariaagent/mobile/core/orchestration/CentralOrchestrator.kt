@@ -67,7 +67,7 @@ class CentralOrchestrator(
     @Volatile var isRunning: Boolean = false; private set
 
     /** Wire dependencies and subscribe to lifecycle events. Idempotent. */
-    suspend fun initialize() = stateMutex.withLock {
+    suspend fun initialize(): Unit = stateMutex.withLock {
         if (isInitialized) {
             Log.w(TAG, "Already initialized")
             return
@@ -117,7 +117,7 @@ class CentralOrchestrator(
         }
     }
 
-    suspend fun stop() = stateMutex.withLock {
+    suspend fun stop(): Unit = stateMutex.withLock {
         if (!isRunning) {
             Log.w(TAG, "Not running")
             return

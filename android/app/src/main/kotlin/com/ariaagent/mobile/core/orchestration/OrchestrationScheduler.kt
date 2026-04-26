@@ -57,7 +57,7 @@ class OrchestrationScheduler(
         this.stageExecutor = executor
     }
 
-    suspend fun start() = stateMutex.withLock {
+    suspend fun start(): Unit = stateMutex.withLock {
         if (running) return
         running = true
         triggerJob = scope.launch {
@@ -74,7 +74,7 @@ class OrchestrationScheduler(
         Log.i(TAG, "Orchestration Scheduler started")
     }
 
-    suspend fun stop() = stateMutex.withLock {
+    suspend fun stop(): Unit = stateMutex.withLock {
         if (!running) return
         running = false
         triggerJob?.cancel()

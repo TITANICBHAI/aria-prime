@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"docs: add FLAWS.md — verified runtime/flow audit (8 alleged flaws → 2 REAL, 3 PARTIAL, 3 HYPOTHETICAL) with file/line evidence and real-life trigger situations. Counters speculative claims about node-registry leaks, long-press retry logic, and OpenCL OOM. Identifies the genuine fixes (orchestration wiring, watchdog race in AgentForegroundService).\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE=\"fix(orchestration): add explicit ': Unit' return type to 4 single-expression suspend functions wrapping stateMutex.withLock { ... } in CentralOrchestrator.{initialize,stop} and OrchestrationScheduler.{start,stop}. Without it, Kotlin inferred the return type as Int because the last lambda expression was Log.i(...) — Android's android.util.Log methods return Int (bytes written). The bare 'return' statements inside then failed compileDebugKotlin with: 'Return type mismatch: expected kotlin.Int, actual kotlin.Unit'. Fixes 4 errors at CentralOrchestrator.kt:73,123 and OrchestrationScheduler.kt:61,78.\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000
