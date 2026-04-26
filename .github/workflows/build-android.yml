@@ -25,18 +25,23 @@ jobs:
           fetch-depth: 0
 
       # ── 1b. Vendor llama.cpp at a pinned release tag ─────────────────────────
-      # Pinned to b6000 — first stable release tag (verified) that contains both
-      # the core llama target and the tools/mtmd multimodal subdirectory that
-      # llama_jni.cpp depends on (#include "mtmd.h", "mtmd-helper.h"). The older
-      # b4870 referenced in docs/07_BUILD_AND_INSTALL.md predates tools/mtmd and
-      # cannot satisfy android/app/src/main/cpp/CMakeLists.txt:123
-      #   add_subdirectory(${LLAMA_DIR}/tools/mtmd mtmd_build)
+      # Pinned to b8935 — latest stable tag that contains every API surface
+      # llama_jni.cpp consumes:
+      #   - llama_context_params.flash_attn_type, LLAMA_FLASH_ATTN_TYPE_AUTO/_DISABLED
+      #   - mtmd_context_params.flash_attn_type, .warmup
+      #   - llama_set_adapters_lora()
+      #   - llama_opt_params.optimizer_type, GGML_OPT_OPTIMIZER_TYPE_ADAMW
+      #   - tools/mtmd/ subdirectory (multimodal vision pipeline)
+      # b6000 had tools/mtmd but lacked flash_attn_type and llama_set_adapters_lora;
+      # the older b4870 referenced in docs/07_BUILD_AND_INSTALL.md is even further
+      # behind. Verified against include/llama.h and ggml/include/ggml-opt.h at
+      # tag b8935 (https://github.com/ggerganov/llama.cpp/releases/tag/b8935).
       # A shallow clone of a single tag finishes in <10s and keeps CI
       # deterministic across reruns. Skipped if the directory is already vendored.
-      - name: Vendor llama.cpp @ b6000
+      - name: Vendor llama.cpp @ b8935
         run: |
           LLAMA_DIR="android/app/src/main/cpp/llama.cpp"
-          LLAMA_TAG="b6000"
+          LLAMA_TAG="b8935"
           if [ -d "$LLAMA_DIR/.git" ] || [ -f "$LLAMA_DIR/CMakeLists.txt" ]; then
             echo "[llama.cpp] already present at $LLAMA_DIR — skipping clone"
           else
