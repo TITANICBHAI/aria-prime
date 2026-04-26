@@ -38,12 +38,12 @@ outputType = "webview"
 name = "Push to GitHub"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/push.sh"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "COMMIT_MESSAGE=\"port: orchestration layer (14 files, ~1965 LOC) from AII donor to Kotlin under core/orchestration/ — closes AGENT_INSTRUCTIONS gap #3. CentralOrchestrator is now a plain coroutine class (no Service); ProblemSolvingBroker takes a pluggable ProblemSolver (Groq dependency dropped); OrchestrationScheduler stage execution is pluggable (FeedbackSystem/ErrorResolutionWorkflow deps dropped); CircuitBreaker package typo fixed. Updated DONOR_INVENTORY, ARCHITECTURE, AGENT_INSTRUCTIONS, replit.md.\" bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000

@@ -13,22 +13,22 @@ The orchestration spine that aria-ai is missing. Port the whole package as a uni
 
 | File | Lines | Status | Spine target |
 |------|------:|--------|--------------|
-| CentralAIOrchestrator.java | 307 | pending | `core/orchestration/CentralOrchestrator.kt` |
-| EventRouter.java | 91 | pending | `core/orchestration/EventRouter.kt` |
-| CircuitBreaker.java | 95 | pending | `core/orchestration/CircuitBreaker.kt` (fix package typo on line 1) |
-| HealthMonitor.java | 209 | pending | `core/orchestration/HealthMonitor.kt` |
-| DiffEngine.java | 179 | pending | `core/orchestration/DiffEngine.kt` |
-| ComponentRegistry.java | 188 | pending | `core/orchestration/ComponentRegistry.kt` |
-| ComponentInterface.java | 31 | pending | `core/orchestration/Component.kt` (rename to interface) |
-| ComponentStateSnapshot.java | 65 | pending | `core/orchestration/ComponentStateSnapshot.kt` |
-| OrchestrationEvent.java | 48 | pending | `core/orchestration/OrchestrationEvent.kt` |
-| OrchestrationScheduler.java | 339 | pending | `core/orchestration/OrchestrationScheduler.kt` |
-| ProblemSolvingBroker.java | 174 | pending | `core/orchestration/ProblemSolvingBroker.kt` |
-| ProblemTicket.java | 113 | pending | `core/orchestration/ProblemTicket.kt` |
-| StateDiff.java | 94 | pending | `core/orchestration/StateDiff.kt` |
-| ValidationContract.java | 32 | pending | `core/orchestration/ValidationContract.kt` |
+| CentralAIOrchestrator.java | 307 | **ported** | `core/orchestration/CentralOrchestrator.kt` (no longer extends `Service` — see README) |
+| EventRouter.java | 91 | **ported** | `core/orchestration/EventRouter.kt` (coroutine-based fan-out) |
+| CircuitBreaker.java | 95 | **ported** | `core/orchestration/CircuitBreaker.kt` (donor package typo fixed) |
+| HealthMonitor.java | 209 | **ported** | `core/orchestration/HealthMonitor.kt` (configurable thresholds) |
+| DiffEngine.java | 179 | **ported** | `core/orchestration/DiffEngine.kt` (FieldDiff.DiffType enum) |
+| ComponentRegistry.java | 188 | **ported** | `core/orchestration/ComponentRegistry.kt` |
+| ComponentInterface.java | 31 | **ported** | `core/orchestration/ComponentInterface.kt` (suspend lifecycle hooks) |
+| ComponentStateSnapshot.java | 65 | **ported** | `core/orchestration/ComponentStateSnapshot.kt` (data class) |
+| OrchestrationEvent.java | 48 | **ported** | `core/orchestration/OrchestrationEvent.kt` (`Type` constants object) |
+| OrchestrationScheduler.java | 339 | **ported** | `core/orchestration/OrchestrationScheduler.kt` (StageExecutor pluggable, FeedbackSystem/ErrorResolutionWorkflow deps dropped) |
+| ProblemSolvingBroker.java | 174 | **ported** | `core/orchestration/ProblemSolvingBroker.kt` (Groq replaced with `ProblemSolver` interface — spine plugs in LlamaEngine) |
+| ProblemTicket.java | 113 | **ported** | `core/orchestration/ProblemTicket.kt` |
+| StateDiff.java | 94 | **ported** | `core/orchestration/StateDiff.kt` |
+| ValidationContract.java | 32 | **ported** | `core/orchestration/ValidationContract.kt` (`fun interface`) |
 
-**Total:** 14 files, ~1,965 LOC. Highest priority donor block.
+**Total:** 14 files, ~1,965 LOC → ported to Kotlin under `android/app/src/main/kotlin/com/ariaagent/mobile/core/orchestration/`. See `core/orchestration/README.md` for porting decisions and follow-up wiring required (LlamaProblemSolver adapter, real StageExecutor, EventRouter↔AgentEventBus bridge, components implementing `ComponentInterface`).
 
 ## donors/orchestration-components-java/ — from AII
 

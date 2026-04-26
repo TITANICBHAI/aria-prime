@@ -30,10 +30,12 @@
                          └───────────────┘
 ```
 
-After porting `donors/orchestration-java/`, every box above becomes a registered **Component** in the orchestration layer:
+`donors/orchestration-java/` has now been ported to Kotlin under
+`core/orchestration/`. Every box above is intended to become a registered
+**Component** in the orchestration layer:
 
 ```
-   ┌──────────────────── CentralOrchestrator (Service) ─────────────────────┐
+   ┌──────────────────── CentralOrchestrator (plain class) ─────────────────┐
    │                                                                         │
    │   ComponentRegistry  ──  EventRouter  ──  HealthMonitor  ──  CircuitBreaker
    │           │                   ▲                  │                       │
@@ -41,12 +43,21 @@ After porting `donors/orchestration-java/`, every box above becomes a registered
    │   register/start            publish/         heartbeat                  │
    │   /stop/snapshot           subscribe         + diff                    │
    │                                                                         │
+   │   DiffEngine ── OrchestrationScheduler ── ProblemSolvingBroker          │
+   │   (snapshots)    (pipelines + triggers)    (LLM-backed diagnosis)       │
    └─────────────────────────────────────────────────────────────────────────┘
                   ▲                ▲                ▲              ▲
                   │                │                │              │
               LlamaEngine    AgentLoop       ObjectDetector   PolicyNetwork
                (Component)   (Component)       (Component)     (Component)
 ```
+
+> **Note:** `CentralOrchestrator` is a plain coroutine-based class in the
+> spine, not an Android `Service`. The spine's existing `AgentForegroundService`
+> owns the orchestrator instance. See `core/orchestration/README.md` for the
+> follow-up wiring (LlamaProblemSolver adapter, real StageExecutor,
+> EventRouter↔AgentEventBus bridge, components implementing
+> `ComponentInterface`).
 
 ## Layers
 
@@ -58,15 +69,15 @@ After porting `donors/orchestration-java/`, every box above becomes a registered
 | Perception | `core/perception/` | Kotlin | A11y + MediaPipe object detection + (TBD) OCR |
 | RL | `core/rl/` | Kotlin → JNI | REINFORCE policy network, LoRA fine-tune, IRL fallback |
 | Actions | `system/actions/` | Kotlin | accessibility-driven gesture executor |
-| Events | `core/events/` | Kotlin | pub/sub event bus (to be replaced by EventRouter from donors) |
+| Events | `core/events/` | Kotlin | UI-facing pub/sub event bus (`AgentEventBus`); orchestration uses its own `EventRouter` |
 | Native | `android/app/src/main/cpp/` | C++ | aria_math, llama_jni, lora_train (compiled separately) |
-| **Orchestration** | `core/orchestration/` | **TBD — to be ported from donors** | lifecycle, health, circuit breaking, diffing, scheduling |
+| **Orchestration** | `core/orchestration/` | **Kotlin (ported from donors)** | lifecycle, health, circuit breaking, diffing, scheduling, LLM-backed problem solving |
 | **Scheduler** | `app/src/main/java/com/aiassistant/scheduler/` | **TBD — Java drop-in from donors** | named tasks, triggers, action handlers |
 | **Algorithms** | `core/rl/algorithms/` | **TBD — port from donors** | DQN, PPO, SARSA, MetaLearning |
 
 ## Process model
 
-Single Android process. The agent itself runs inside `CentralAIOrchestrator`, an Android `Service` (foreground when active, bound when interacting with the UI). Screen access requires the `AccessibilityService` to be enabled by the user. The gesture executor uses `AccessibilityService.dispatchGesture()`.
+Single Android process. The agent runs inside `AgentForegroundService` (foreground when active, bound when interacting with the UI), which holds and drives a `CentralOrchestrator` instance. Screen access requires the `AccessibilityService` to be enabled by the user. The gesture executor uses `AccessibilityService.dispatchGesture()`.
 
 ## Memory budget (Samsung Galaxy M31, 6 GB RAM, target device)
 
@@ -88,7 +99,7 @@ Single Android process. The agent itself runs inside `CentralAIOrchestrator`, an
 | OCR | `Dispatchers.IO` |
 | RL update | `Dispatchers.Default` |
 | Gesture dispatch | Main / Accessibility callback |
-| Event bus | dedicated cached thread pool inside `EventRouter` (after port) |
+| Event bus | `Dispatchers.Default` via `SupervisorJob` inside `EventRouter` |
 | File I/O (model load, LoRA save) | `Dispatchers.IO` |
 
 ## Data on disk
