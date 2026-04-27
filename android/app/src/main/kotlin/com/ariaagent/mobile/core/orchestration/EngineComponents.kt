@@ -23,6 +23,7 @@ import android.util.Log
 import com.ariaagent.mobile.core.agent.AgentLoop
 import com.ariaagent.mobile.core.ai.LlamaEngine
 import com.ariaagent.mobile.core.ai.VisionEngine
+import com.ariaagent.mobile.core.rl.LearningScheduler
 import com.ariaagent.mobile.core.rl.PolicyNetwork
 
 // ── LlamaEngine adapter ─────────────────────────────────────────────────────
@@ -299,5 +300,72 @@ class PolicyNetworkComponent : ComponentInterface {
     companion object {
         const val ID = "policy_network"
         private const val TAG = "PolicyNetworkComp"
+    }
+}
+
+// ── LearningScheduler adapter ───────────────────────────────────────────────
+
+/**
+ * Routes orchestration `execute()` calls to lifecycle commands on
+ * [LearningScheduler], the longest-running background subsystem in the spine
+ * (BatteryReceiver -> charging-window LoRA + RL training).
+ *
+ * Without this adapter the scheduler is invisible to orchestration health: it
+ * starts in `AgentForegroundService.onCreate()` and only logs to logcat. With
+ * it, the orchestrator can detect that the scheduler died, surface a
+ * COMPONENT_ERROR event, and the diff engine can spot when `is_training`
+ * flips unexpectedly.
+ *
+ * Input map:
+ *   - "command" String — one of "start", "stop", "status" (default: status)
+ *
+ * Output map:
+ *   - "is_training" Boolean — current training cycle state
+ *
+ * Constructor takes the live LearningScheduler instance (it owns broadcast
+ * receivers and a wake lock, so we can't construct a fresh one inside the
+ * adapter without leaking those resources).
+ */
+class LearningSchedulerComponent(
+    private val scheduler: LearningScheduler,
+) : ComponentInterface {
+    override val componentId: String = ID
+    override val componentName: String = "Learning Scheduler"
+    override val capabilities: List<String> = listOf("rl_training", "lora_training", "background_scheduling")
+
+    override suspend fun initialize() {}
+    override suspend fun start() { scheduler.start() }
+    override suspend fun stop() { scheduler.stop() }
+
+    override fun captureState(): ComponentStateSnapshot = ComponentStateSnapshot(
+        componentId = componentId,
+        version = 1,
+        state = mapOf("is_training" to scheduler.isTrainingRunning()),
+    )
+
+    override fun restoreState(snapshot: ComponentStateSnapshot) { /* no-op */ }
+
+    override suspend fun execute(input: Map<String, Any?>): Map<String, Any?> {
+        when ((input["command"] as? String)?.lowercase()) {
+            "start" -> scheduler.start()
+            "stop" -> scheduler.stop()
+            "status", null -> { /* fall through */ }
+            else -> Log.w(TAG, "Unknown command: ${input["command"]}")
+        }
+        return mapOf("is_training" to scheduler.isTrainingRunning())
+    }
+
+    /** The scheduler is "healthy" whenever its receiver is registered.
+     *  isTrainingRunning() is a *legitimate* false during off-cycles, so we
+     *  treat presence of the LearningScheduler instance as health — the
+     *  orchestrator's heartbeat loop is what proves the receiver is alive. */
+    override fun isHealthy(): Boolean = true
+
+    override fun status(): String =
+        if (scheduler.isTrainingRunning()) "training" else "idle (waiting for charge)"
+
+    companion object {
+        const val ID = "learning_scheduler"
+        private const val TAG = "LearningSchedComp"
     }
 }

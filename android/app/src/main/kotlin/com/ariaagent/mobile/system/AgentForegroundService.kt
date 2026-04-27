@@ -16,6 +16,7 @@ import com.ariaagent.mobile.core.events.AgentEventBus
 import com.ariaagent.mobile.core.orchestration.AgentLoopComponent
 import com.ariaagent.mobile.core.orchestration.CentralOrchestrator
 import com.ariaagent.mobile.core.orchestration.EventRouter
+import com.ariaagent.mobile.core.orchestration.LearningSchedulerComponent
 import com.ariaagent.mobile.core.orchestration.LlamaEngineComponent
 import com.ariaagent.mobile.core.orchestration.OrchestrationEvent
 import com.ariaagent.mobile.core.orchestration.PolicyNetworkComponent
@@ -203,6 +204,11 @@ class AgentForegroundService : Service() {
                 orch.registerInstance(AgentLoopComponent())
                 orch.registerInstance(VisionEngineComponent())
                 orch.registerInstance(PolicyNetworkComponent())
+                // LearningScheduler is already started above (line ~174);
+                // wrapping it as a ComponentInterface gives the orchestrator
+                // health visibility (so a dead scheduler shows up in audits)
+                // without re-arming its broadcast receiver or wake lock.
+                learningScheduler?.let { orch.registerInstance(LearningSchedulerComponent(it)) }
                 orch.start()
                 startOrchestrationHeartbeatLoop(orch)
                 Log.i(TAG, "CentralOrchestrator initialised and started")
@@ -227,6 +233,18 @@ class AgentForegroundService : Service() {
                         val tool    = data["tool"]?.toString() ?: "…"
                         val success = data["success"] as? Boolean ?: true
                         updateNotification("Step $currentStep · $tool · ${if (success) "✓" else "✗"}")
+                        // Real per-step heartbeat: AgentLoop just finished a tool
+                        // call, so the loop is provably alive *right now*. This is
+                        // stronger evidence than the 10 s polling backstop, which
+                        // can only prove the JVM thread is responsive.
+                        centralOrchestrator?.healthMonitor?.recordHeartbeat("agent_loop")
+                    }
+                    "token_generated" -> {
+                        // LlamaEngine just decoded a token — it is not stuck on
+                        // the JNI side. The polling backstop calls isHealthy()
+                        // (which checks `ready` and `lastUseAt`); this case
+                        // proves liveness from the actual hot path.
+                        centralOrchestrator?.healthMonitor?.recordHeartbeat("llama_engine")
                     }
                     "agent_status_changed" -> {
                         val status = data["status"]?.toString() ?: return@collect

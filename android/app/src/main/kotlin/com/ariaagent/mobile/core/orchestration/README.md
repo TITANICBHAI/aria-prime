@@ -128,3 +128,30 @@ scope.launch { orchestrator.start() }
   `LlamaProblemSolver.solve()` (i.e. real on-device `LlamaEngine.infer`)
   for a diagnosis. End-to-end: agent failure → ticket → LLM diagnosis,
   no fake hops.
+- ~~Feed `DiffEngine` real snapshots so STATE_DIFF_DETECTED can fire.~~
+  **Done (2026-04-27)** — `CentralOrchestrator.registerInstance()` now seeds
+  `diffEngine.setExpectedState(component.captureState())` and an initial
+  `latestSnapshot` at registration time, so the first registered state
+  becomes the baseline. `performPeriodicAudit()` then iterates
+  `componentInstances`, calls each `captureState()`, and feeds the result
+  to `diffEngine.captureSnapshot(...)` *before* `performPeriodicDiffCheck()`
+  runs. Result: a real divergence (e.g. `LlamaEngine` `loaded` flips to
+  `false` mid-run) emits `STATE_DIFF_DETECTED` on the event router, which
+  the bus bridge already re-broadcasts as `orchestration.STATE_DIFF_DETECTED`
+  for the UI.
+- ~~Promote `LearningScheduler` to an orchestration component.~~ **Done
+  (2026-04-27)** — `EngineComponents.kt` adds `LearningSchedulerComponent`
+  (constructor takes the live `LearningScheduler` so we don't double-arm
+  its broadcast receiver or wake lock). `AgentForegroundService.onCreate()`
+  registers it after the four engines via
+  `orch.registerInstance(LearningSchedulerComponent(it))`. The scheduler
+  now appears in audits with `state = { is_training: Bool }` and shows up
+  in `status()` as `"training"` or `"idle (waiting for charge)"`.
+- ~~Bus-event-driven heartbeats from real engine activity.~~ **Done
+  (2026-04-27)** — the existing `AgentEventBus.flow.collect` block in
+  `AgentForegroundService` now records a heartbeat for `agent_loop` on
+  every `action_performed` event (proves the loop just ran a tool call)
+  and for `llama_engine` on every `token_generated` event (proves the
+  GGUF decoder is alive on the JNI side). The 10 s polling backstop
+  remains for `vision_engine`, `policy_network`, `learning_scheduler`,
+  which don't emit per-step bus events.

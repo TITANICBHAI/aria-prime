@@ -227,6 +227,17 @@ class CentralOrchestrator(
     private fun performPeriodicAudit() {
         Log.d(TAG, "Performing periodic audit")
         healthMonitor.performHealthCheck()
+        // Feed DiffEngine a fresh snapshot from every live instance before
+        // it runs the diff sweep — otherwise its `latestSnapshots` map
+        // contains only the seed snapshot from registerInstance() and the
+        // diff is always trivially empty.
+        for ((id, component) in componentInstances) {
+            try {
+                diffEngine.captureSnapshot(component.captureState())
+            } catch (t: Throwable) {
+                Log.w(TAG, "captureState() threw for $id", t)
+            }
+        }
         diffEngine.performPeriodicDiffCheck()
     }
 
@@ -252,6 +263,18 @@ class CentralOrchestrator(
         // window doesn't immediately flag the component as stale.
         registry.updateComponentStatus(component.componentId, ComponentRegistry.ComponentStatus.ACTIVE)
         healthMonitor.recordHeartbeat(component.componentId)
+        // Seed the DiffEngine with the component's own initial snapshot as
+        // the *expected* state. Subsequent periodic captures become the
+        // *actual* state, so a real divergence (e.g. llama_engine "loaded"
+        // flips to false unexpectedly) fires STATE_DIFF_DETECTED on the
+        // event router.
+        try {
+            val snapshot = component.captureState()
+            diffEngine.setExpectedState(snapshot)
+            diffEngine.captureSnapshot(snapshot)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to seed DiffEngine snapshot for ${component.componentId}", t)
+        }
         Log.i(TAG, "Registered live instance: ${component.componentId} (${component.capabilities})")
     }
 
