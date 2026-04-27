@@ -3,6 +3,8 @@
 **Audit date:** 2026-04-26
 **Last status update:** 2026-04-27 — REAL #1, REAL #6, PARTIAL #2, PARTIAL #5, PARTIAL #7 all addressed in this session. See per-flaw "Resolution" notes and the updated summary table.
 
+**Follow-up landed same day:** the orchestration wiring is now real (not just instantiated). `EngineComponents.kt` defines `LlamaEngineComponent` / `VisionEngineComponent` / `AgentLoopComponent` / `PolicyNetworkComponent` adapters; `CentralOrchestrator` plugs a `RegistryStageExecutor` into the scheduler before `start()`, so registered pipelines actually run real code instead of `NoopStageExecutor`'s `{"status":"noop"}`. `AgentForegroundService` registers the four live instances via `registerInstance(...)`, runs a 10-second heartbeat loop so components don't go stale, and bridges agent-loop errors back into the orchestrator's `EventRouter` as `COMPONENT_ERROR` so the `ProblemSolvingBroker` actually fires the on-device LLM diagnostic path. See `core/orchestration/README.md` follow-up section for the full breakdown.
+
 **Method:** code-walk of every file claimed in the alleged-flaw list, then test each claim against the actual source. Each flaw is labelled:
 
 - 🔴 **REAL** — verified in code; will trigger on a Galaxy M31 / Android 10 device under the described situation.

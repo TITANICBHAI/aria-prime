@@ -95,12 +95,36 @@ scope.launch { orchestrator.start() }
   current engines (`llama_engine`, `agent_loop`, `vision_engine`,
   `policy_network`), and torn down in `onDestroy()`. The instance is exposed
   to other modules as `AgentForegroundService.sharedOrchestrator`.
-- Implement a real `OrchestrationScheduler.StageExecutor` that resolves
-  `componentId` → `ComponentInterface` and invokes `execute()`. Currently the
-  scheduler still uses `NoopStageExecutor`, so registered pipelines log
-  `{"status":"noop", …}` instead of running real work — fine while the engines
-  haven't yet been migrated to `ComponentInterface`.
-- Migrate `AgentLoop`, `LlamaEngine`, `ObjectDetectorEngine`, `PolicyNetwork`,
-  `LoraTrainer`, `GestureEngine` to implement `ComponentInterface`. Once any
-  engine implements the interface, the spine can plug a real `StageExecutor`
-  that fans out into `ComponentInterface.execute(input)` via the registry.
+- ~~Implement a real `OrchestrationScheduler.StageExecutor` that resolves
+  `componentId` → `ComponentInterface` and invokes `execute()`.~~ **Done
+  (2026-04-27)** — `CentralOrchestrator` now owns a `componentInstances`
+  map and a private `registryStageExecutor` that looks up the live adapter
+  by id and calls its `execute()`. The executor is plugged into the
+  scheduler in `start()` *before* trigger evaluation begins, so the old
+  `NoopStageExecutor` is never reached once `start()` returns. Unknown
+  component ids return `null`, which trips the scheduler's existing
+  circuit-breaker recording.
+- ~~Migrate `AgentLoop`, `LlamaEngine`, `ObjectDetectorEngine`, `PolicyNetwork`,
+  `LoraTrainer`, `GestureEngine` to implement `ComponentInterface`.~~ **Done
+  for the four engines that ship today (2026-04-27)** — `EngineComponents.kt`
+  defines `LlamaEngineComponent`, `VisionEngineComponent`, `AgentLoopComponent`,
+  `PolicyNetworkComponent`. They are thin adapters (engines stay decoupled
+  from the orchestration package) and are registered via
+  `orch.registerInstance(...)` in `AgentForegroundService.onCreate()`.
+  `LoraTrainer` / `GestureEngine` adapters can be added by the same pattern
+  when those engines land in the spine.
+- ~~Heartbeat producer for live components.~~ **Done (2026-04-27)** —
+  `AgentForegroundService.startOrchestrationHeartbeatLoop()` polls each
+  registered live instance every 10 s and records a heartbeat when
+  `isHealthy()` returns true. Without this, every component would go stale
+  after the 30 s window and be flipped to `DEGRADED` on the first health
+  sweep.
+- ~~Bus → orchestration error bridge.~~ **Done (2026-04-27)** — when the
+  agent loop emits `agent_status_changed status=error` on `AgentEventBus`,
+  `AgentForegroundService` publishes a matching `COMPONENT_ERROR`
+  `OrchestrationEvent` on the orchestrator's `EventRouter`. The
+  orchestrator's existing `handleComponentError` then submits a
+  `ProblemTicket` to `ProblemSolvingBroker`, which calls
+  `LlamaProblemSolver.solve()` (i.e. real on-device `LlamaEngine.infer`)
+  for a diagnosis. End-to-end: agent failure → ticket → LLM diagnosis,
+  no fake hops.

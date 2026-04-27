@@ -9,6 +9,7 @@ package com.ariaagent.mobile.core.orchestration
 
 import android.content.Context
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,9 +60,36 @@ class CentralOrchestrator(
     val scheduler: OrchestrationScheduler =
         OrchestrationScheduler(registry, eventRouter, healthMonitor)
 
+    /**
+     * Live ComponentInterface instances keyed by componentId. Populated via
+     * [registerInstance]; consumed by [registryStageExecutor] which the
+     * scheduler invokes for each pipeline stage. This is what closes the
+     * "noop" gap — instead of returning canned `{"status":"noop"}`, the
+     * scheduler now calls the real engine adapter.
+     */
+    private val componentInstances = ConcurrentHashMap<String, ComponentInterface>()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val stateMutex = Mutex()
     private var auditJob: Job? = null
+
+    /** Real stage executor that resolves componentId -> ComponentInterface
+     *  and dispatches `execute()`. Returns null on unknown component so the
+     *  scheduler records an error and trips its circuit breaker. */
+    private val registryStageExecutor = OrchestrationScheduler.StageExecutor { stage, data ->
+        val component = componentInstances[stage.componentId]
+        if (component == null) {
+            Log.w(TAG, "RegistryStageExecutor: no instance for ${stage.componentId}")
+            null
+        } else {
+            try {
+                component.execute(data)
+            } catch (t: Throwable) {
+                Log.e(TAG, "RegistryStageExecutor: ${stage.componentId} threw", t)
+                null
+            }
+        }
+    }
 
     @Volatile var isInitialized: Boolean = false; private set
     @Volatile var isRunning: Boolean = false; private set
@@ -98,6 +126,10 @@ class CentralOrchestrator(
         if (!isInitialized) initialize()
 
         stateMutex.withLock {
+            // Plug the real stage executor before the scheduler starts firing
+            // trigger rules so registered pipelines hit the engines, not the
+            // NoopStageExecutor.
+            scheduler.setStageExecutor(registryStageExecutor)
             healthMonitor.start()
             scheduler.start()
 
@@ -197,6 +229,35 @@ class CentralOrchestrator(
         healthMonitor.performHealthCheck()
         diffEngine.performPeriodicDiffCheck()
     }
+
+    /**
+     * Register a real [ComponentInterface] instance and put it on the registry.
+     *
+     * This is the preferred entry point: it wires the live engine adapter into
+     * [componentInstances] (so [registryStageExecutor] can dispatch to it) AND
+     * mirrors the registration on [ComponentRegistry] so health checks, diff
+     * tracking, and capability lookup all see the same component.
+     *
+     * If you only need the registry entry (no executable behaviour), keep
+     * using `registry.registerComponent(id, name, capabilities)` directly.
+     */
+    fun registerInstance(component: ComponentInterface) {
+        componentInstances[component.componentId] = component
+        registry.registerComponent(
+            componentId = component.componentId,
+            componentName = component.componentName,
+            capabilities = component.capabilities,
+        )
+        // Mark ACTIVE + record an initial heartbeat so the first health check
+        // window doesn't immediately flag the component as stale.
+        registry.updateComponentStatus(component.componentId, ComponentRegistry.ComponentStatus.ACTIVE)
+        healthMonitor.recordHeartbeat(component.componentId)
+        Log.i(TAG, "Registered live instance: ${component.componentId} (${component.capabilities})")
+    }
+
+    /** Look up the live instance for a componentId, if one was registered
+     *  via [registerInstance]. Returns null for registry-only components. */
+    fun getInstance(componentId: String): ComponentInterface? = componentInstances[componentId]
 
     /** Convenience accessor for the application context held by orchestration. */
     fun applicationContext(): Context = appContext

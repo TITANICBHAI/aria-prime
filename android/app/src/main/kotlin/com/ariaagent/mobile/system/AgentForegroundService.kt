@@ -13,8 +13,13 @@ import com.ariaagent.mobile.ui.ComposeMainActivity
 import com.ariaagent.mobile.core.agent.AgentLoop
 import com.ariaagent.mobile.core.ai.LlamaProblemSolver
 import com.ariaagent.mobile.core.events.AgentEventBus
+import com.ariaagent.mobile.core.orchestration.AgentLoopComponent
 import com.ariaagent.mobile.core.orchestration.CentralOrchestrator
 import com.ariaagent.mobile.core.orchestration.EventRouter
+import com.ariaagent.mobile.core.orchestration.LlamaEngineComponent
+import com.ariaagent.mobile.core.orchestration.OrchestrationEvent
+import com.ariaagent.mobile.core.orchestration.PolicyNetworkComponent
+import com.ariaagent.mobile.core.orchestration.VisionEngineComponent
 import com.ariaagent.mobile.core.rl.LearningScheduler
 import com.ariaagent.mobile.core.system.ThermalGuard
 import kotlinx.coroutines.CoroutineScope
@@ -188,27 +193,18 @@ class AgentForegroundService : Service() {
                     for ((k, v) in evt.data) if (v != null) payload[k] = v
                     AgentEventBus.emit("orchestration.${evt.eventType}", payload)
                 }
-                orch.registry.registerComponent(
-                    componentId = "llama_engine",
-                    componentName = "Llama Engine",
-                    capabilities = listOf("inference", "diagnosis", "embedding"),
-                )
-                orch.registry.registerComponent(
-                    componentId = "agent_loop",
-                    componentName = "Agent Loop",
-                    capabilities = listOf("reasoning", "stepping"),
-                )
-                orch.registry.registerComponent(
-                    componentId = "vision_engine",
-                    componentName = "Vision Engine",
-                    capabilities = listOf("ocr", "detection"),
-                )
-                orch.registry.registerComponent(
-                    componentId = "policy_network",
-                    componentName = "Policy Network",
-                    capabilities = listOf("rl", "action_scoring"),
-                )
+                // FLAWS.md follow-up — register LIVE ComponentInterface
+                // adapters, not name-only entries. The orchestrator's real
+                // RegistryStageExecutor (wired in start()) dispatches stage
+                // calls straight into these adapters, so any pipeline that
+                // names "llama_engine" or "vision_engine" actually runs the
+                // engine instead of the old NoopStageExecutor's canned reply.
+                orch.registerInstance(LlamaEngineComponent())
+                orch.registerInstance(AgentLoopComponent())
+                orch.registerInstance(VisionEngineComponent())
+                orch.registerInstance(PolicyNetworkComponent())
                 orch.start()
+                startOrchestrationHeartbeatLoop(orch)
                 Log.i(TAG, "CentralOrchestrator initialised and started")
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to bring up CentralOrchestrator", t)
@@ -250,6 +246,24 @@ class AgentForegroundService : Service() {
                             "error" -> {
                                 val err = data["lastError"]?.toString() ?: "unknown"
                                 Log.w(TAG, "Agent error: $err (retry $autoRetryCount/$MAX_AUTO_RETRIES)")
+
+                                // Push the failure into the orchestrator so its
+                                // ProblemSolvingBroker can ask the on-device LLM
+                                // for a diagnosis. This is the bus->orchestration
+                                // direction; the orchestration->bus bridge runs
+                                // above (the WILDCARD subscriber).
+                                centralOrchestrator?.eventRouter?.publish(
+                                    OrchestrationEvent(
+                                        eventType = OrchestrationEvent.Type.COMPONENT_ERROR,
+                                        source = "agent_loop",
+                                        data = mapOf(
+                                            "error_type" to "agent_loop_error",
+                                            "error_message" to err,
+                                            "step" to currentStep,
+                                            "goal" to currentGoal,
+                                        ),
+                                    ),
+                                )
 
                                 if (!stopRequested &&
                                     autoRetryCount < MAX_AUTO_RETRIES &&
@@ -343,6 +357,39 @@ class AgentForegroundService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    /**
+     * Periodically poll every registered ComponentInterface and record a
+     * heartbeat for the ones that report `isHealthy()`. This is the missing
+     * heartbeat producer the HealthMonitor needs — without it every component
+     * goes stale after the 30-second timeout window and is marked degraded
+     * the first time the health check sweeps.
+     *
+     * Cheap: just iterates the four-ish registered IDs, no I/O. Runs every
+     * 10 s on the service scope; cancelled when the service is destroyed.
+     */
+    private fun startOrchestrationHeartbeatLoop(orch: CentralOrchestrator) {
+        serviceScope.launch {
+            // Components we expect to keep alive. The list is small and
+            // explicit so we don't accidentally heartbeat stale registry
+            // entries that no longer have a live instance.
+            val ids = listOf(
+                LlamaEngineComponent.ID,
+                AgentLoopComponent.ID,
+                VisionEngineComponent.ID,
+                PolicyNetworkComponent.ID,
+            )
+            while (true) {
+                delay(10_000L)
+                for (id in ids) {
+                    val component = orch.getInstance(id) ?: continue
+                    if (component.isHealthy()) {
+                        orch.healthMonitor.recordHeartbeat(id)
+                    }
+                }
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

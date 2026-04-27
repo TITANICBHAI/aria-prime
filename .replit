@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE='fix(flaws): wire CentralOrchestrator and close 5 audited flaws (REAL #1, REAL #6, PARTIAL #2/#5/#7). See FLAWS.md Resolution notes.' bash scripts/push.sh"
+args = "COMMIT_MESSAGE='feat(orch): real RegistryStageExecutor + ComponentInterface adapters, end the noop era. EngineComponents.kt wraps LlamaEngine/VisionEngine/AgentLoop/PolicyNetwork as ComponentInterface; CentralOrchestrator.registerInstance() + RegistryStageExecutor dispatches stages to live adapters; AgentForegroundService heartbeat loop + bus->orchestration error bridge so agent failures actually fire the LLM diagnostic path.' bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000
