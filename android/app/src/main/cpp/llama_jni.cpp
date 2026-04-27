@@ -4,6 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <atomic>
+#include <cctype>           // std::tolower / std::isspace for backend-string normalisation
 #include <sys/stat.h>
 
 #include "llama.h"
@@ -102,8 +103,22 @@ Java_com_ariaagent_mobile_core_ai_LlamaEngine_nativeLoadModel(
     // We build an explicit list so the user's Settings choice is always honoured.
     std::vector<ggml_backend_dev_t> selected_devices;
 
-    bool want_vulkan = (strcmp(gpu_backend, "vulkan") == 0) && (n_gpu_layers > 0);
-    bool want_opencl = (strcmp(gpu_backend, "opencl") == 0) && (n_gpu_layers > 0);
+    // FLAWS.md #7 — accept "Vulkan", "VULKAN", " vulkan ", etc. The Settings
+    // screen historically saved a capitalised string; an exact strcmp would
+    // silently fall through to "default priority" without the user knowing
+    // their explicit choice was ignored. Normalise to lowercase + trim before
+    // comparing.
+    std::string backend_norm(gpu_backend);
+    // strip surrounding whitespace
+    while (!backend_norm.empty() && std::isspace(static_cast<unsigned char>(backend_norm.front())))
+        backend_norm.erase(backend_norm.begin());
+    while (!backend_norm.empty() && std::isspace(static_cast<unsigned char>(backend_norm.back())))
+        backend_norm.pop_back();
+    for (char& c : backend_norm)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    bool want_vulkan = (backend_norm == "vulkan") && (n_gpu_layers > 0);
+    bool want_opencl = (backend_norm == "opencl") && (n_gpu_layers > 0);
 
     if (want_vulkan || want_opencl) {
         ggml_backend_dev_t cpu_dev = nullptr;

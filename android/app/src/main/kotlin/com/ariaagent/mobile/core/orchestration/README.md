@@ -82,9 +82,25 @@ scope.launch { orchestrator.start() }
   **Done** — `core/ai/LlamaProblemSolver.kt`. Defaults to `maxTokens=256`,
   `temperature=0.3` (conservative diagnostics). Throws when the model is not
   loaded so the broker escalates the ticket honestly.
+- ~~Bridge `EventRouter` ↔ `AgentEventBus` so orchestration health events show
+  up in the Compose UI's Activity / Modules screens.~~ **Done (2026-04-27)** —
+  `AgentForegroundService.onCreate()` subscribes a wildcard listener on
+  `EventRouter` and re-emits each event onto `AgentEventBus` under the
+  `"orchestration.<eventType>"` namespace, with the originating component id
+  copied into the payload as `"source"`. The Compose UI subscribes to that
+  same bus, so any orchestration event is one `flow.collect { … }` away.
+- ~~Wire `CentralOrchestrator` into the Android lifecycle.~~ **Done
+  (2026-04-27)** — constructed with `LlamaProblemSolver()` in
+  `AgentForegroundService.onCreate()`, started after registering the four
+  current engines (`llama_engine`, `agent_loop`, `vision_engine`,
+  `policy_network`), and torn down in `onDestroy()`. The instance is exposed
+  to other modules as `AgentForegroundService.sharedOrchestrator`.
 - Implement a real `OrchestrationScheduler.StageExecutor` that resolves
-  `componentId` → `ComponentInterface` and invokes `execute()`.
-- Bridge `EventRouter` ↔ `AgentEventBus` so orchestration health events show
-  up in the Compose UI's Activity / Modules screens.
+  `componentId` → `ComponentInterface` and invokes `execute()`. Currently the
+  scheduler still uses `NoopStageExecutor`, so registered pipelines log
+  `{"status":"noop", …}` instead of running real work — fine while the engines
+  haven't yet been migrated to `ComponentInterface`.
 - Migrate `AgentLoop`, `LlamaEngine`, `ObjectDetectorEngine`, `PolicyNetwork`,
-  `LoraTrainer`, `GestureEngine` to implement `ComponentInterface`.
+  `LoraTrainer`, `GestureEngine` to implement `ComponentInterface`. Once any
+  engine implements the interface, the spine can plug a real `StageExecutor`
+  that fans out into `ComponentInterface.execute(input)` via the registry.

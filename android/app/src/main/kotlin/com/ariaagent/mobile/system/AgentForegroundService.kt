@@ -11,13 +11,18 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ariaagent.mobile.ui.ComposeMainActivity
 import com.ariaagent.mobile.core.agent.AgentLoop
+import com.ariaagent.mobile.core.ai.LlamaProblemSolver
 import com.ariaagent.mobile.core.events.AgentEventBus
+import com.ariaagent.mobile.core.orchestration.CentralOrchestrator
+import com.ariaagent.mobile.core.orchestration.EventRouter
 import com.ariaagent.mobile.core.rl.LearningScheduler
 import com.ariaagent.mobile.core.system.ThermalGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -72,6 +77,14 @@ class AgentForegroundService : Service() {
         const val EXTRA_APP_PACKAGE = "appPackage"
         const val EXTRA_LEARN_ONLY  = "learnOnly"
 
+        // FLAWS.md #1 — share the live CentralOrchestrator so other modules
+        // (LearningScheduler, AppSkillRegistry, AgentLoop) can publish health
+        // signals without holding a Service reference. Set by onCreate, cleared
+        // by onDestroy. May be null before the service starts.
+        @Volatile
+        var sharedOrchestrator: com.ariaagent.mobile.core.orchestration.CentralOrchestrator? = null
+            private set
+
         /**
          * Convenience: start the foreground service with a goal.
          */
@@ -113,6 +126,14 @@ class AgentForegroundService : Service() {
     // Started in onCreate(), stopped in onDestroy().
     private var learningScheduler: LearningScheduler? = null
 
+    // ── CentralOrchestrator (FLAWS.md #1) ─────────────────────────────────────
+    // Component-level coordinator: registry, event router, diff engine, health
+    // monitor, scheduler, and LLM-backed problem-solving broker. Constructed
+    // and started here (the service is the natural Android lifecycle owner)
+    // and torn down in onDestroy. Other modules can grab it via the static
+    // [orchestrator] accessor.
+    private var centralOrchestrator: CentralOrchestrator? = null
+
     // ── Auto-recovery watchdog ────────────────────────────────────────────────
     // When the agent loop crashes (status = "error"), automatically retry up to
     // MAX_AUTO_RETRIES times with a 5-second cool-down between attempts.
@@ -120,6 +141,12 @@ class AgentForegroundService : Service() {
     private var autoRetryCount = 0
     private val MAX_AUTO_RETRIES = 3
     private val RETRY_DELAY_MS   = 5_000L
+
+    // FLAWS.md #6 — the retry coroutine is launched **separately** from the
+    // bus collector so a 5-second cool-down does not block the whole event
+    // pipeline (and therefore does not race the user's Stop button).
+    @Volatile private var pendingRetryJob: Job? = null
+    @Volatile private var stopRequested: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -141,8 +168,61 @@ class AgentForegroundService : Service() {
         learningScheduler = LearningScheduler(this).also { it.start() }
         Log.i(TAG, "LearningScheduler started — auto-training active during charging")
 
+        // ── CentralOrchestrator (FLAWS.md #1) ──────────────────────────────────
+        // Construct the orchestrator with the on-device LLM as its problem-solver,
+        // bridge orchestration events onto the spine's AgentEventBus so the UI can
+        // observe component health, register the engines we know about today, then
+        // start the periodic audit loop. All of this is launched on a coroutine so
+        // that initialise()'s suspend calls don't block the Service main thread.
+        val orch = CentralOrchestrator(
+            context = this,
+            problemSolver = LlamaProblemSolver(),
+        )
+        centralOrchestrator = orch
+        sharedOrchestrator = orch
+        serviceScope.launch {
+            try {
+                orch.initialize()
+                orch.eventRouter.subscribe(EventRouter.WILDCARD) { evt ->
+                    val payload = mutableMapOf<String, Any>("source" to evt.source)
+                    for ((k, v) in evt.data) if (v != null) payload[k] = v
+                    AgentEventBus.emit("orchestration.${evt.eventType}", payload)
+                }
+                orch.registry.registerComponent(
+                    componentId = "llama_engine",
+                    componentName = "Llama Engine",
+                    capabilities = listOf("inference", "diagnosis", "embedding"),
+                )
+                orch.registry.registerComponent(
+                    componentId = "agent_loop",
+                    componentName = "Agent Loop",
+                    capabilities = listOf("reasoning", "stepping"),
+                )
+                orch.registry.registerComponent(
+                    componentId = "vision_engine",
+                    componentName = "Vision Engine",
+                    capabilities = listOf("ocr", "detection"),
+                )
+                orch.registry.registerComponent(
+                    componentId = "policy_network",
+                    componentName = "Policy Network",
+                    capabilities = listOf("rl", "action_scoring"),
+                )
+                orch.start()
+                Log.i(TAG, "CentralOrchestrator initialised and started")
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to bring up CentralOrchestrator", t)
+            }
+        }
+
         // Subscribe to AgentEventBus to keep the notification current AND
         // to drive the auto-recovery watchdog on error status.
+        //
+        // FLAWS.md #6 — this collector MUST stay non-blocking. The watchdog's
+        // 5-second cool-down used to live inside this `collect` block, which
+        // froze the bus subscriber and let "agent_status_changed=done/idle"
+        // and ACTION_STOP races slip through. The retry now runs on its own
+        // coroutine and is cancelled when the user (or the OS) stops us.
         serviceScope.launch {
             AgentEventBus.flow.collect { (name, data) ->
                 when (name) {
@@ -157,6 +237,8 @@ class AgentForegroundService : Service() {
                         when (status) {
                             "done" -> {
                                 autoRetryCount = 0
+                                pendingRetryJob?.cancel()
+                                pendingRetryJob = null
                                 updateNotification("Done — tap to open ARIA")
                             }
                             "idle" -> {
@@ -169,15 +251,27 @@ class AgentForegroundService : Service() {
                                 val err = data["lastError"]?.toString() ?: "unknown"
                                 Log.w(TAG, "Agent error: $err (retry $autoRetryCount/$MAX_AUTO_RETRIES)")
 
-                                if (autoRetryCount < MAX_AUTO_RETRIES && currentGoal.isNotBlank()) {
+                                if (!stopRequested &&
+                                    autoRetryCount < MAX_AUTO_RETRIES &&
+                                    currentGoal.isNotBlank()
+                                ) {
                                     autoRetryCount++
                                     val attempt = autoRetryCount
                                     updateNotification("Error: $err — retrying ($attempt/$MAX_AUTO_RETRIES)…")
-                                    // Wait before retrying to let the device cool and let
-                                    // any pending cleanup finish (garbage collect, etc.)
-                                    kotlinx.coroutines.delay(RETRY_DELAY_MS)
-                                    Log.i(TAG, "Auto-recovery attempt $attempt — restarting goal: $currentGoal")
-                                    AgentLoop.start(this@AgentForegroundService, currentGoal, currentAppPackage)
+                                    // Cancel any prior in-flight retry (rare but possible
+                                    // if the loop emits two errors in quick succession).
+                                    pendingRetryJob?.cancel()
+                                    pendingRetryJob = serviceScope.launch {
+                                        // Wait off-thread so the bus collector keeps
+                                        // pumping events (e.g. user-initiated STOP).
+                                        delay(RETRY_DELAY_MS)
+                                        if (stopRequested) {
+                                            Log.i(TAG, "Auto-recovery attempt $attempt cancelled — stop requested")
+                                            return@launch
+                                        }
+                                        Log.i(TAG, "Auto-recovery attempt $attempt — restarting goal: $currentGoal")
+                                        AgentLoop.start(this@AgentForegroundService, currentGoal, currentAppPackage)
+                                    }
                                 } else {
                                     updateNotification("Error: $err — max retries reached, tap to restart")
                                 }
@@ -214,6 +308,9 @@ class AgentForegroundService : Service() {
                 currentAppPackage = appPackage
                 currentStep       = 0
                 autoRetryCount    = 0
+                stopRequested     = false   // FLAWS.md #6 — re-arm the watchdog
+                pendingRetryJob?.cancel()
+                pendingRetryJob   = null
                 // Persist goal so OS-restart recovery can resume it (Bug #5 fix)
                 getSharedPreferences("aria_service_state", Context.MODE_PRIVATE).edit()
                     .putString("currentGoal", goal)
@@ -227,7 +324,10 @@ class AgentForegroundService : Service() {
             }
             ACTION_STOP -> {
                 Log.i(TAG, "Stopping agent loop via service command")
-                autoRetryCount = MAX_AUTO_RETRIES  // prevent watchdog from re-starting
+                stopRequested  = true             // FLAWS.md #6 — block in-flight retry
+                pendingRetryJob?.cancel()
+                pendingRetryJob = null
+                autoRetryCount = MAX_AUTO_RETRIES // prevent watchdog from re-arming
                 AgentLoop.stop()
                 // Clear persisted goal so a future OS restart doesn't resume a cancelled task
                 getSharedPreferences("aria_service_state", Context.MODE_PRIVATE).edit()
@@ -249,9 +349,23 @@ class AgentForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // FLAWS.md #6 — make sure the watchdog cannot re-fire after teardown.
+        stopRequested = true
+        pendingRetryJob?.cancel()
+        pendingRetryJob = null
+
         learningScheduler?.stop()
         learningScheduler = null
         ThermalGuard.unregister(this)
+
+        // FLAWS.md #1 — tear the orchestrator down before cancelling the
+        // service scope so its periodic audit and scheduler coroutines exit
+        // cleanly. shutdown() is non-suspending and cancels its own internal
+        // scope, so we don't need to call stop() first.
+        centralOrchestrator?.shutdown()
+        centralOrchestrator = null
+        sharedOrchestrator = null
+
         serviceScope.cancel()
         Log.i(TAG, "AgentForegroundService destroyed")
     }

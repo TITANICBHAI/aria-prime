@@ -95,6 +95,12 @@ object AgentLoop {
     private const val MAX_STEPS_PER_SUBTASK = 30  // per-sub-task ceiling — prevents one task eating all budget
     private const val A11Y_RETRY_COUNT = 3        // retry attempts before declaring service dead
     private const val A11Y_RETRY_DELAY_MS = 2_000L
+    // FLAWS.md #5 — adaptive backoff for the in-loop "(not ready)" sentinel.
+    // Starts at 250 ms so the first transient settles fast (most a11y-unready
+    // states clear within one window animation frame), then doubles up to a
+    // 2-second cap so we don't hammer ScreenObserver if the service is wedged.
+    private const val A11Y_SENTINEL_BACKOFF_INITIAL_MS = 250L
+    private const val A11Y_SENTINEL_BACKOFF_MAX_MS     = 2_000L
     private const val STEP_DELAY_MS = 800L
     private const val SCREEN_SETTLE_MS = 600L
     private const val WAIT_RETRY_DELAY_MS = 1200L
@@ -160,6 +166,10 @@ object AgentLoop {
             val actionHistory    = mutableListOf<String>()
             val actionToolHistory= mutableListOf<String>()  // for UsagePatternTracker
             var previousSnapshot: ScreenObserver.ScreenSnapshot? = null
+            // FLAWS.md #5 — per-run adaptive backoff for the a11y "(not ready)"
+            // sentinel. Reset to the initial value below whenever a real tree
+            // is observed, doubled (capped) on every consecutive sentinel hit.
+            var a11ySentinelBackoffMs = A11Y_SENTINEL_BACKOFF_INITIAL_MS
 
             // Phase 15: track element names acted on for AppSkillRegistry frequency counting
             val elementsTouched = mutableListOf<String>()
@@ -332,8 +342,11 @@ object AgentLoop {
                     val a11ySentinel = snapshot.a11yTree == "(not ready)" ||
                                        snapshot.a11yTree == "(accessibility service not active)"
                     if (a11ySentinel) {
+                        // FLAWS.md #5 — adaptive backoff. A flat 2 s wait was
+                        // tuned for "service truly dead" but punished the much
+                        // more common "tree just hasn't propagated yet" case.
                         Log.w("AgentLoop",
-                            "A11y sentinel detected ('${snapshot.a11yTree}') — pausing until service is ready")
+                            "A11y sentinel detected ('${snapshot.a11yTree}') — backing off ${a11ySentinelBackoffMs}ms")
                         state = state.copy(status = Status.PAUSED, lastError = "accessibility_not_ready")
                         AgentEventBus.emit("agent_status_changed", mapOf(
                             "status"      to "paused",
@@ -343,10 +356,15 @@ object AgentLoop {
                             "lastAction"  to state.lastAction,
                             "lastError"   to "accessibility_not_ready"
                         ))
-                        delay(A11Y_RETRY_DELAY_MS)
+                        delay(a11ySentinelBackoffMs)
+                        a11ySentinelBackoffMs = (a11ySentinelBackoffMs * 2)
+                            .coerceAtMost(A11Y_SENTINEL_BACKOFF_MAX_MS)
                         state = state.copy(status = Status.RUNNING, lastError = "")
                         continue
                     }
+                    // Real tree this iteration → reset the sentinel backoff so
+                    // the next transient is handled fast again.
+                    a11ySentinelBackoffMs = A11Y_SENTINEL_BACKOFF_INITIAL_MS
 
                     // In learn-only mode the screen never changes (we never act),
                     // so skip the change-detection gate — process every observed frame.

@@ -1,6 +1,8 @@
 # Aria-Prime — Flow & Logic Flaws Audit
 
 **Audit date:** 2026-04-26
+**Last status update:** 2026-04-27 — REAL #1, REAL #6, PARTIAL #2, PARTIAL #5, PARTIAL #7 all addressed in this session. See per-flaw "Resolution" notes and the updated summary table.
+
 **Method:** code-walk of every file claimed in the alleged-flaw list, then test each claim against the actual source. Each flaw is labelled:
 
 - 🔴 **REAL** — verified in code; will trigger on a Galaxy M31 / Android 10 device under the described situation.
@@ -38,6 +40,8 @@ The previous commits ported 14 orchestration files and added the `LlamaProblemSo
 
 **Fix path** — orchestration follow-ups (b) `StageExecutor`, (c) `EventRouter ↔ AgentEventBus` bridge, (d) make engines implement `ComponentInterface`, plus a one-liner in `AgentForegroundService.onCreate()` that constructs `CentralOrchestrator(this, LlamaProblemSolver())` and calls `orchestrator.start()`.
 
+**Resolution (2026-04-27)** — `AgentForegroundService.onCreate()` now constructs `CentralOrchestrator(this, LlamaProblemSolver())`, subscribes a wildcard `EventRouter` listener that re-emits orchestration events onto `AgentEventBus` under the `"orchestration.*"` namespace, registers the four engines we have today (`llama_engine`, `agent_loop`, `vision_engine`, `policy_network`), then calls `initialize()` + `start()`. The live instance is exposed as `AgentForegroundService.sharedOrchestrator` for other modules. `onDestroy()` calls `shutdown()` before cancelling the service scope. Follow-ups (b) and (d) — real `StageExecutor` + `ComponentInterface` adapters — remain open and are tracked in `core/orchestration/README.md`.
+
 ---
 
 ## 🟡 PARTIAL #2 — `LlamaEngine.load()` has risky defaults, but no real caller hits them
@@ -60,6 +64,8 @@ Both call sites pass every parameter explicitly from `ModelManager`'s saved conf
 A future contributor writes a unit test or a debug screen that calls `LlamaEngine.load(path)` with only the path, accepts the defaults, and ships it. That code path will request 32 GPU layers via OpenCL on first run. On the M31 that allocates roughly **1.1 GB of GPU-visible memory** in addition to the 1.4 GB heap copy of the GGUF. Total RSS ≈ 2.5 GB on a device with ~3 GB free after Android. The LMK doesn't kill us immediately because it's still under the LMK threshold for foreground services — but the Mali driver will return `CL_MEM_OBJECT_ALLOCATION_FAILURE` and `nativeLoadModel` returns 0, leaving `isLoaded()` false. The agent prints "stub mode" and silently degrades.
 
 **Fix path** — change the defaults in `LlamaEngine.load()` to `nGpuLayers = 0` and `gpuBackend = "cpu"`. CPU-only is the safe default; opt-in for GPU. Loud failure beats silent degradation.
+
+**Resolution (2026-04-27)** — `LlamaEngine.load()` defaults are now `nGpuLayers = 0` / `gpuBackend = "cpu"` with an in-source explainer comment. The two production call sites in `AgentViewModel` continue to pass explicit values from `ModelManager`'s saved config and are unaffected.
 
 ---
 
@@ -117,6 +123,8 @@ The user opens the app on a cold boot. The a11y service takes 1–3 s to attach 
 
 **Fix path** — change `A11Y_RETRY_DELAY_MS` to a starting backoff of 250 ms with exponential growth capped at 2 s. Resets after a successful observation.
 
+**Resolution (2026-04-27)** — `AgentLoop` now keeps a per-run `a11ySentinelBackoffMs` starting at 250 ms (`A11Y_SENTINEL_BACKOFF_INITIAL_MS`), doubling on each consecutive sentinel hit and capped at `A11Y_SENTINEL_BACKOFF_MAX_MS = 2_000L`. The original `A11Y_RETRY_DELAY_MS = 2_000L` constant is retained for the `AgentAccessibilityService.isActive` "service truly dead" check (lines 287–306), where a 2 s wait is still the right call. The mid-loop sentinel path now resets the backoff to 250 ms whenever a real tree is observed.
+
 ---
 
 ## 🔴 REAL #6 — `kotlinx.coroutines.delay` inside `AgentEventBus.flow.collect` (in `AgentForegroundService`) blocks subsequent events
@@ -153,6 +161,8 @@ serviceScope.launch {
 
 **Fix path** — move the retry delay into a separate `serviceScope.launch { delay(...); start(...) }` so the collect block returns immediately. Then use a guard (`autoRetryCount >= MAX_AUTO_RETRIES || stopRequested`) checked _after_ the delay to abort the retry if the user intervened.
 
+**Resolution (2026-04-27)** — The retry now runs in its own `pendingRetryJob = serviceScope.launch { delay(RETRY_DELAY_MS); … }`, so the bus collector returns immediately and continues processing `done`/`idle`/`paused`/`action_performed` events. A `@Volatile stopRequested` flag is set by `ACTION_STOP` and `onDestroy()` (and cleared by `ACTION_START`); the launched coroutine re-checks it after the delay and bails out if the user (or the OS) asked us to stop. `pendingRetryJob` is also cancelled directly on stop, so even an in-flight delay is torn down promptly.
+
 ---
 
 ## 🟡 PARTIAL #7 — Both GPU backends compiled in, but runtime selection is a string
@@ -167,6 +177,8 @@ The JNI wrapper in `llama_jni.cpp` has to translate that string into the right `
 User opens **Settings → GPU Backend → Vulkan** chip selector. The chip stores `"Vulkan"` (matching the chip label) instead of `"vulkan"`. JNI sees an unknown string, llama.cpp falls back to CPU, user sees ~3 tok/s instead of ~20 tok/s and assumes Vulkan is broken when actually they never enabled it.
 
 **Verdict** — this depends on the JNI implementation, which I haven't read in this audit. Filed as PARTIAL pending verification. The CI build will tell us if both backends at least compile; the runtime correctness needs an on-device test.
+
+**Resolution (2026-04-27)** — Audited `llama_jni.cpp` lines 105–135. The previous implementation used `strcmp(gpu_backend, "vulkan") == 0` and `strcmp(gpu_backend, "opencl") == 0` — exactly the case-sensitive trap described above. The string is now lowercased and trimmed before comparison (`backend_norm == "vulkan"` / `"opencl"`), so `"Vulkan"`, `"VULKAN"`, `" vulkan "` all route to the right device. Unknown strings still log `"Backend '<value>' not found in registry — using default priority"` so the runtime fallback is visible in logcat instead of silent. `<cctype>` was added to the includes for `std::tolower` / `std::isspace`.
 
 ---
 
@@ -187,15 +199,15 @@ The "instant crash" framing is overblown. What actually happens on bad days is `
 
 ## Summary table
 
-| # | Severity | One-line summary | Where it bites in real life | Suggested fix order |
+| # | Severity | Status | One-line summary | Where it bites in real life |
 |---|---|---|---|---|
-| 1 | 🔴 REAL | Orchestration layer never instantiated | Component failures aren't diagnosed; ticket system is dead | First: orchestration follow-ups (b)/(c)/(d) |
-| 2 | 🟡 PARTIAL | `LlamaEngine.load()` defaults to OpenCL + 32 layers | Only future code that omits params; current callers safe | Change defaults to CPU/0 layers, ship soon |
-| 3 | ⚪ HYPOTHETICAL | Long-press has no retry | Not a real bug — LLM-driven retry is correct | No-op |
-| 4 | ⚪ HYPOTHETICAL | Node registry leaks | Recycled on every rebuild — no leak | No-op |
-| 5 | 🟡 PARTIAL | A11y sentinel sleeps 2 s flat | Mid-session pauses are slower than they need to be | Adaptive backoff |
-| 6 | 🔴 REAL | `delay(5_000)` inside `flow.collect` blocks the bus | Stop-button can race with auto-retry, restarting after user stop | Split the delay into its own coroutine |
-| 7 | 🟡 PARTIAL | GPU backend selected by string — typo = silent CPU fallback | Settings UI may save the wrong casing | Verify JNI string handling, add fallback log |
-| 8 | ⚪ HYPOTHETICAL | OpenCL allocates 1+ GB and crashes | Allocation usually succeeds; the real risk is silent stub fallback (covered by #2) | Covered by #2 |
+| 1 | 🔴 REAL | ✅ FIXED 2026-04-27 | Orchestration layer never instantiated | Component failures aren't diagnosed; ticket system is dead |
+| 2 | 🟡 PARTIAL | ✅ FIXED 2026-04-27 | `LlamaEngine.load()` defaults to OpenCL + 32 layers | Only future code that omits params; current callers safe |
+| 3 | ⚪ HYPOTHETICAL | — | Long-press has no retry | Not a real bug — LLM-driven retry is correct |
+| 4 | ⚪ HYPOTHETICAL | — | Node registry leaks | Recycled on every rebuild — no leak |
+| 5 | 🟡 PARTIAL | ✅ FIXED 2026-04-27 | A11y sentinel sleeps 2 s flat | Mid-session pauses are slower than they need to be |
+| 6 | 🔴 REAL | ✅ FIXED 2026-04-27 | `delay(5_000)` inside `flow.collect` blocks the bus | Stop-button can race with auto-retry, restarting after user stop |
+| 7 | 🟡 PARTIAL | ✅ FIXED 2026-04-27 | GPU backend selected by string — typo = silent CPU fallback | Settings UI may save the wrong casing |
+| 8 | ⚪ HYPOTHETICAL | — | OpenCL allocates 1+ GB and crashes | Allocation usually succeeds; the real risk is silent stub fallback (covered by #2) |
 
-**Net signal:** of 8 alleged flaws, **2 are genuinely real and worth fixing soon** (orchestration wiring, watchdog race), **3 are partials worth filing**, and **3 are hypothetical and can be closed**. The audit is the difference between a 3-line fix and a fortnight of refactoring scary-but-non-existent bugs.
+**Net signal:** of 8 alleged flaws, **2 were genuinely real** (orchestration wiring, watchdog race) and **3 were partials** — all five are now fixed in the codebase as of 2026-04-27. The remaining 3 entries are confirmed-hypothetical and intentionally unchanged. The audit is the difference between a 3-line fix and a fortnight of refactoring scary-but-non-existent bugs.

@@ -43,7 +43,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "COMMIT_MESSAGE=\"fix(link): rename common -> llama-common in target_link_libraries(llama-jni). The b8935 common/CMakeLists.txt renamed the target from 'common' to 'llama-common' (and split out 'llama-common-base'); the old name causes ld.lld error: unable to find library -lcommon. Vulkan + SPIRV staging worked perfectly: ggml-vulkan.cpp compiled cleanly, only the final libllama-jni.so link step failed.\" bash scripts/push.sh"
+args = "COMMIT_MESSAGE='fix(flaws): wire CentralOrchestrator and close 5 audited flaws (REAL #1, REAL #6, PARTIAL #2/#5/#7). See FLAWS.md Resolution notes.' bash scripts/push.sh"
 
 [[ports]]
 localPort = 5000

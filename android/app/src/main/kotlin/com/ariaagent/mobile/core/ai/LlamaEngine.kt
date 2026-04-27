@@ -70,8 +70,14 @@ object LlamaEngine {
     fun load(
         path: String,
         contextSize: Int = 2048,
-        nGpuLayers: Int = 32,
-        gpuBackend: String = "opencl",
+        // FLAWS.md #2 — defaults are deliberately conservative. The Settings
+        // screen should override these once the user opts into a GPU backend
+        // and confirms it works on their device. Shipping `gpu_backend=opencl`
+        // + `n_gpu_layers=32` as the default would silently OOM-fault on
+        // devices whose Mali OpenCL driver cannot allocate the full model
+        // footprint, with no fallback path. CPU-only is slow but always works.
+        nGpuLayers: Int = 0,
+        gpuBackend: String = "cpu",
         flashAttn: Boolean = false,
         kvCacheQuant: Boolean = false,
         memoryMapping: String = "auto",
