@@ -58,6 +58,7 @@ class FloatingChatService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         savedStateController.performAttach()
         savedStateController.performRestore(null)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,12 +69,14 @@ class FloatingChatService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         }
         if (overlayView == null) setup()
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        isRunning = true
         return START_STICKY
     }
 
     override fun onDestroy() {
         teardown()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        isRunning = false
         super.onDestroy()
     }
 
@@ -159,5 +162,12 @@ class FloatingChatService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
     companion object {
         const val ACTION_STOP = "com.ariaagent.mobile.STOP_FLOATING_CHAT"
+
+        // Round 4: lets DiagnosticsScreen show the live overlay state via
+        // AgentViewModel.refreshFloatingChatActive(). Set in onCreate / cleared
+        // in onDestroy so even an OS-killed service flips this back to false.
+        @Volatile
+        var isRunning: Boolean = false
+            private set
     }
 }

@@ -73,6 +73,7 @@ fun SettingsScreen(
     vm: AgentViewModel = viewModel(),
     onNavigateToSafety: (() -> Unit)? = null,
     onNavigateToKnowledge: (() -> Unit)? = null,
+    onNavigateToDiagnostics: (() -> Unit)? = null,
 ) {
     val context      = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -295,14 +296,51 @@ fun SettingsScreen(
             }
         }
 
-        // ── Model Catalog (moved to Modules) ─────────────────────────────────
-        SettingsCard(
-            modifier = Modifier.clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-                onClick    = { /* Navigate handled by parent — user should go to Modules tab */ }
-            )
-        ) {
+        // ── Diagnostics (orchestrator + components + overlay toggle) ─────────
+        if (onNavigateToDiagnostics != null) {
+            SettingsCard(
+                modifier = Modifier.clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick    = onNavigateToDiagnostics
+                )
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                            .background(ARIAColors.Success.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.MonitorHeart, contentDescription = null, tint = ARIAColors.Success, modifier = Modifier.size(20.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Diagnostics",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = ARIAColors.Success, fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                        Text(
+                            "Component health · orchestrator events · floating chat overlay",
+                            style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                        )
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = ARIAColors.Muted, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        // ── Model Catalog (informational — managed from the Modules tab) ─────
+        // Round 4 fix: this card used to have a clickable modifier with an empty
+        // onClick lambda. The text already says "moved to Modules", so the card
+        // is now purely informational (no fake clickable surface).
+        SettingsCard {
             Row(
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

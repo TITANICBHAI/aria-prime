@@ -31,6 +31,9 @@ import com.ariaagent.mobile.core.patterns.SuggestionStore
 import com.ariaagent.mobile.core.rl.IrlModule
 import com.ariaagent.mobile.core.rl.LoraTrainer
 import com.ariaagent.mobile.core.rl.PolicyNetwork
+import com.ariaagent.mobile.core.orchestration.ComponentRegistry
+import com.ariaagent.mobile.core.orchestration.OrchestrationEvent
+import com.ariaagent.mobile.core.orchestration.ProblemTicket
 import com.ariaagent.mobile.system.AgentForegroundService
 import com.ariaagent.mobile.system.accessibility.AgentAccessibilityService
 import com.ariaagent.mobile.system.overlay.FloatingChatService
@@ -349,6 +352,47 @@ data class SuggestionBannerItem(
     val repeatCount: Int,
 )
 
+// ── Round 4: Orchestration UI surfacing ───────────────────────────────────────
+//
+// The CentralOrchestrator + ComponentRegistry + HealthMonitor + DiffEngine +
+// ProblemSolvingBroker subsystem (rounds 1–3) was wired into the spine but had
+// no on-device UI. These data classes feed the new DiagnosticsScreen so the
+// user can actually see registered components, their health, recent
+// orchestration bus events, and the floating-chat overlay state.
+
+/** Snapshot of a single registered component for [DiagnosticsScreen]. */
+data class OrchestrationComponentUi(
+    val componentId: String,
+    val componentName: String,
+    val capabilities: List<String>,
+    val status: String,                // ACTIVE / DEGRADED / ERROR / ISOLATED / INACTIVE / INITIALIZING
+    val lastHeartbeat: Long,
+    val errorCount: Int,
+    val successCount: Int,
+    val consecutiveFailures: Int,
+    val restartCount: Int,
+    val circuitBreakerOpen: Boolean,
+)
+
+/** A recent orchestration bus event ("orchestration.<type>") for the diagnostics feed. */
+data class OrchestrationEventUi(
+    val timestamp: Long,
+    val eventType: String,             // e.g. "component.error", "state.diff.detected"
+    val source: String,                // emitting component id
+    val summary: String,               // short human-readable line
+    val severity: String,              // "info" | "warn" | "error"
+)
+
+/** Diagnostics screen aggregate — last refreshed snapshot of the orchestrator. */
+data class OrchestrationStatusUi(
+    val available: Boolean = false,
+    val components: List<OrchestrationComponentUi> = emptyList(),
+    val activeTickets: Int = 0,
+    val lastResolution: String = "",
+    val lastResolutionAt: Long = 0L,
+    val lastRefreshAt: Long = 0L,
+)
+
 /**
  * AgentViewModel — primary state holder for the Jetpack Compose UI.
  *
@@ -494,6 +538,30 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _screenCaptureRequestFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val screenCaptureRequestFlow: SharedFlow<Unit> = _screenCaptureRequestFlow.asSharedFlow()
 
+    // Round 4: floating-chat overlay UX. The agent used to silently start the
+    // overlay when SYSTEM_ALERT_WINDOW was already granted, and silently no-op
+    // when it wasn't — so first-run users had no path to grant the permission
+    // and no way to summon the overlay outside of an agent run. The Diagnostics
+    // screen exposes a real toggle that calls [toggleFloatingChat]; if the
+    // permission is missing we emit on this flow and the host Activity launches
+    // ACTION_MANAGE_OVERLAY_PERMISSION (mirrors the screen-capture pattern).
+    private val _overlayPermissionRequestFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val overlayPermissionRequestFlow: SharedFlow<Unit> = _overlayPermissionRequestFlow.asSharedFlow()
+
+    private val _floatingChatActive = MutableStateFlow(false)
+    val floatingChatActive: StateFlow<Boolean> = _floatingChatActive.asStateFlow()
+
+    // Round 4: orchestration UI surface — snapshot + recent-event ring buffer
+    // for [DiagnosticsScreen]. The orchestrator emits onto AgentEventBus as
+    // "orchestration.<eventType>" via the bridge installed in
+    // AgentForegroundService; the bus collector below funnels those into these
+    // flows so a single screen can render the whole subsystem.
+    private val _orchestrationStatus = MutableStateFlow(OrchestrationStatusUi())
+    val orchestrationStatus: StateFlow<OrchestrationStatusUi> = _orchestrationStatus.asStateFlow()
+
+    private val _orchestrationEvents = MutableStateFlow<List<OrchestrationEventUi>>(emptyList())
+    val orchestrationEvents: StateFlow<List<OrchestrationEventUi>> = _orchestrationEvents.asStateFlow()
+
     // ── Model download state (Fix 2) ──────────────────────────────────────────
 
     private val _llmDownloading = MutableStateFlow(false)
@@ -628,6 +696,14 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                     "skill_updated"           -> handleSkillUpdated(data)
                     "task_chain_advanced"     -> handleTaskChainAdvanced(data)
                     "config_updated"          -> { /* handled by ConfigStore.flow() above */ }
+                    else -> {
+                        // Round 4: route every "orchestration.<type>" bus event into
+                        // the diagnostics ring buffer so the new DiagnosticsScreen
+                        // can show component lifecycle / health / state-diff signals.
+                        if (name.startsWith("orchestration.")) {
+                            handleOrchestrationEvent(name.removePrefix("orchestration."), data)
+                        }
+                    }
                 }
             }
         }
@@ -1710,23 +1786,158 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         stopFloatingChat()
     }
 
-    /** Start the floating chat overlay if SYSTEM_ALERT_WINDOW permission is granted. */
-    private fun startFloatingChat() {
+    /**
+     * Start the floating chat overlay if SYSTEM_ALERT_WINDOW is granted.
+     *
+     * Round 4 change: previously private + silently no-op when the permission
+     * was missing. Now public so [DiagnosticsScreen] can summon the overlay
+     * outside of an agent run, and any missing-permission case emits on
+     * [overlayPermissionRequestFlow] so the host Activity can launch the
+     * system Settings page.
+     */
+    fun startFloatingChat() {
         if (android.provider.Settings.canDrawOverlays(context)) {
             runCatching {
                 context.startService(Intent(context, FloatingChatService::class.java))
+                _floatingChatActive.value = true
             }
+        } else {
+            _overlayPermissionRequestFlow.tryEmit(Unit)
         }
     }
 
     /** Stop the floating chat overlay service. */
-    private fun stopFloatingChat() {
+    fun stopFloatingChat() {
         runCatching {
             context.startService(
                 Intent(context, FloatingChatService::class.java).apply {
                     action = FloatingChatService.ACTION_STOP
                 }
             )
+        }
+        _floatingChatActive.value = false
+    }
+
+    /**
+     * Toggle the floating chat overlay on or off. Used by [DiagnosticsScreen]
+     * so the user can summon the overlay independently of starting the agent.
+     */
+    fun toggleFloatingChat() {
+        if (_floatingChatActive.value) stopFloatingChat() else startFloatingChat()
+    }
+
+    // ─── Round 4: orchestration diagnostics ───────────────────────────────────
+
+    /**
+     * Pull a fresh snapshot of the [CentralOrchestrator] (registry + health
+     * monitor + active tickets). Called on a polling loop while the
+     * DiagnosticsScreen is on top so we don't have to re-emit every health
+     * delta over the bus. Safe to call from the main thread.
+     */
+    fun refreshOrchestrationStatus() {
+        viewModelScope.launch(Dispatchers.Default) {
+            val orch = AgentForegroundService.sharedOrchestrator
+            if (orch == null) {
+                _orchestrationStatus.value = OrchestrationStatusUi(
+                    available     = false,
+                    lastRefreshAt = System.currentTimeMillis(),
+                )
+                return@launch
+            }
+            val components = orch.registry.getAllComponents().map { c ->
+                val health  = orch.healthMonitor.getComponentHealth(c.componentId)
+                val breaker = orch.healthMonitor.getCircuitBreaker(c.componentId)
+                OrchestrationComponentUi(
+                    componentId         = c.componentId,
+                    componentName       = c.componentName,
+                    capabilities        = c.capabilities,
+                    status              = c.status.name,
+                    lastHeartbeat       = c.lastHeartbeat,
+                    errorCount          = health?.errorCount ?: 0,
+                    successCount        = health?.successCount ?: 0,
+                    consecutiveFailures = health?.consecutiveFailures ?: 0,
+                    restartCount        = health?.restartCount ?: 0,
+                    circuitBreakerOpen  = breaker?.state?.name == "OPEN",
+                )
+            }.sortedWith(compareByDescending<OrchestrationComponentUi> {
+                // sort: errors first, then degraded, then by name
+                when (it.status) { "ERROR", "ISOLATED" -> 3; "DEGRADED" -> 2; "ACTIVE" -> 1; else -> 0 }
+            }.thenBy { it.componentName })
+            _orchestrationStatus.update { prev -> prev.copy(
+                available     = true,
+                components    = components,
+                lastRefreshAt = System.currentTimeMillis(),
+            )}
+        }
+    }
+
+    /** Refresh the live floating-chat state (e.g. after returning from settings). */
+    fun refreshFloatingChatActive() {
+        if (!android.provider.Settings.canDrawOverlays(context)) {
+            _floatingChatActive.value = false
+        } else {
+            _floatingChatActive.value = FloatingChatService.isRunning
+        }
+    }
+
+    /**
+     * Convert an "orchestration.<type>" bus event into a UI-friendly entry
+     * and prepend it onto the rolling 50-event diagnostics buffer. Also bumps
+     * the last-resolution fields when a problem ticket is solved.
+     */
+    private fun handleOrchestrationEvent(eventType: String, data: Map<String, Any>) {
+        val source = data["source"]?.toString() ?: "?"
+        val severity = when (eventType) {
+            OrchestrationEvent.Type.COMPONENT_ERROR,
+            OrchestrationEvent.Type.HEALTH_CHECK_FAILED        -> "error"
+            OrchestrationEvent.Type.COMPONENT_DEGRADED,
+            OrchestrationEvent.Type.STATE_DIFF_DETECTED        -> "warn"
+            else                                                -> "info"
+        }
+        val summary = when (eventType) {
+            OrchestrationEvent.Type.COMPONENT_REGISTERED ->
+                "Registered ${data["componentName"] ?: source}"
+            OrchestrationEvent.Type.COMPONENT_UNREGISTERED ->
+                "Unregistered $source"
+            OrchestrationEvent.Type.COMPONENT_STATUS_CHANGED ->
+                "$source → ${data["newStatus"] ?: "?"}"
+            OrchestrationEvent.Type.COMPONENT_DEGRADED ->
+                "$source degraded (${data["reason"] ?: "n/a"})"
+            OrchestrationEvent.Type.COMPONENT_ERROR ->
+                "$source error: ${data["error"] ?: "unknown"}"
+            OrchestrationEvent.Type.STATE_DIFF_DETECTED ->
+                "Diff in $source: ${data["summary"] ?: data["field"] ?: "state changed"}"
+            OrchestrationEvent.Type.HEALTH_CHECK_FAILED ->
+                "Health check failed: $source"
+            else -> "$eventType ← $source"
+        }
+        val entry = OrchestrationEventUi(
+            timestamp = System.currentTimeMillis(),
+            eventType = eventType,
+            source    = source,
+            summary   = summary,
+            severity  = severity,
+        )
+        _orchestrationEvents.update { prev -> (listOf(entry) + prev).take(50) }
+
+        // Component-error / status events change registry state — refresh.
+        if (eventType == OrchestrationEvent.Type.COMPONENT_REGISTERED
+            || eventType == OrchestrationEvent.Type.COMPONENT_UNREGISTERED
+            || eventType == OrchestrationEvent.Type.COMPONENT_STATUS_CHANGED
+            || eventType == OrchestrationEvent.Type.COMPONENT_ERROR
+            || eventType == OrchestrationEvent.Type.COMPONENT_DEGRADED
+        ) {
+            refreshOrchestrationStatus()
+        }
+
+        // ProblemSolvingBroker emits resolution events under
+        // "problem.resolved" — surface the most recent one in the header.
+        val resolution = data["resolution"]?.toString()
+        if (!resolution.isNullOrBlank()) {
+            _orchestrationStatus.update { prev -> prev.copy(
+                lastResolution   = resolution.take(280),
+                lastResolutionAt = System.currentTimeMillis(),
+            )}
         }
     }
 

@@ -78,6 +78,7 @@ private const val ROUTE_GOALS            = "goals"
 private const val ROUTE_SAFETY           = "safety"
 private const val ROUTE_ONBOARDING       = "onboarding"
 private const val ROUTE_KNOWLEDGE_WIZARD = "knowledge_wizard"
+private const val ROUTE_DIAGNOSTICS      = "diagnostics"
 
 @Composable
 fun ARIAComposeApp() {
@@ -103,6 +104,22 @@ fun ARIAComposeApp() {
             }
         }
 
+        // Round 4: when the user toggles the floating chat overlay without
+        // SYSTEM_ALERT_WINDOW granted, AgentViewModel emits on this flow and
+        // we drop the user straight into the system "Display over other apps"
+        // settings page (mirrors the screen-capture launcher above).
+        LaunchedEffect(Unit) {
+            vm.overlayPermissionRequestFlow.collect {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                            .setData(android.net.Uri.parse("package:${context.packageName}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+        }
+
         val onRequestScreenCapture: () -> Unit = { vm.requestScreenCapturePermission() }
 
         val onGrantAccessibility: () -> Unit = {
@@ -122,6 +139,7 @@ fun ARIAComposeApp() {
                 && currentRoute != ROUTE_SAFETY
                 && currentRoute != ROUTE_ONBOARDING
                 && currentRoute != ROUTE_KNOWLEDGE_WIZARD
+                && currentRoute != ROUTE_DIAGNOSTICS
 
         Scaffold(
             containerColor = ARIAColors.Background,
@@ -240,6 +258,14 @@ fun ARIAComposeApp() {
                             vm                       = vm,
                             onNavigateToSafety       = { navController.navigate(ROUTE_SAFETY) },
                             onNavigateToKnowledge    = { navController.navigate(ROUTE_KNOWLEDGE_WIZARD) },
+                            onNavigateToDiagnostics  = { navController.navigate(ROUTE_DIAGNOSTICS) },
+                        )
+                    }
+
+                    composable(ROUTE_DIAGNOSTICS) {
+                        DiagnosticsScreen(
+                            vm     = vm,
+                            onBack = { navController.popBackStack() },
                         )
                     }
 
