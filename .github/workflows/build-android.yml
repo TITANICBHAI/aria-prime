@@ -163,13 +163,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # ── 11. Upload build logs on failure ──────────────────────────────────────
-      - name: Upload CMake / NDK logs on failure
-        if: failure()
+      # ── 11. Upload build logs (always — success OR failure) ───────────────────
+      # We want logs from successful builds too: warnings, deprecation notices,
+      # and "soft" CMake messages are otherwise invisible after the run ends.
+      # The on-failure-only path used to mean every flaky build had to be
+      # re-run with --info to diagnose, costing 15+ minutes per attempt.
+      - name: Upload CMake / NDK logs (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
           path: |
             android/app/.cxx/
             android/app/build/intermediates/cmake/
+            android/app/build/reports/
+            android/build/reports/
           retention-days: 7
+          if-no-files-found: ignore

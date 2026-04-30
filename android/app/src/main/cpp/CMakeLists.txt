@@ -155,6 +155,7 @@ add_library(
     SHARED
     llama_jni.cpp
     aria_math.cpp
+    aria_crash_handler.cpp
 )
 
 target_include_directories(llama-jni PRIVATE

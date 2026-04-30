@@ -30,3 +30,7 @@ android/app/src/main/files/rl/
 # Keystore
 *.jks
 *.keystore
+
+# Logging output (host-side build + runtime captures)
+# See scripts/logging/README.md and docs/08_LOGGING.md
+build-logs/
