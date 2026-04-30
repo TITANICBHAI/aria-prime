@@ -115,11 +115,12 @@ class FileLogWriter(
                     queue.poll(500, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) { null } ?: continue
                 try {
-                    writer.write(line)
-                    writer.newLine()
-                    writer.flush()
+                    val w = writer ?: openWriter().also { writer = it }
+                    w.write(line)
+                    w.newLine()
+                    w.flush()
                     if (currentFile().length() >= maxFileBytes) {
-                        writer.close()
+                        w.close()
                         rotate()
                         writer = openWriter()
                     }
