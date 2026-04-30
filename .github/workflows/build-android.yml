@@ -14,10 +14,6 @@ jobs:
 
     steps:
       # ── 1. Checkout with submodules ──────────────────────────────────────────
-      # llama.cpp lives at android/app/src/main/cpp/llama.cpp.
-      # Historically intended as a submodule but the .gitmodules entry was never
-      # committed, so `submodules: recursive` is a no-op and step 1b below is what
-      # actually puts the vendor source in place.
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
@@ -25,21 +21,9 @@ jobs:
           fetch-depth: 0
 
       # ── 1b. Vendor llama.cpp at a pinned release tag ─────────────────────────
-      # Pinned to b8935 — latest stable tag that contains every API surface
-      # llama_jni.cpp consumes:
-      #   - llama_context_params.flash_attn_type, LLAMA_FLASH_ATTN_TYPE_AUTO/_DISABLED
-      #   - mtmd_context_params.flash_attn_type, .warmup
-      #   - llama_set_adapters_lora()
-      #   - llama_opt_params.optimizer_type, GGML_OPT_OPTIMIZER_TYPE_ADAMW
-      #   - tools/mtmd/ subdirectory (multimodal vision pipeline)
-      # b6000 had tools/mtmd but lacked flash_attn_type and llama_set_adapters_lora;
-      # the older b4870 referenced in docs/07_BUILD_AND_INSTALL.md is even further
-      # behind. Verified against include/llama.h and ggml/include/ggml-opt.h at
-      # tag b8935 (https://github.com/ggerganov/llama.cpp/releases/tag/b8935).
-      # A shallow clone of a single tag finishes in <10s and keeps CI
-      # deterministic across reruns. Skipped if the directory is already vendored.
       - name: Vendor llama.cpp @ b8935
         run: |
+          set -x
           LLAMA_DIR="android/app/src/main/cpp/llama.cpp"
           LLAMA_TAG="b8935"
           if [ -d "$LLAMA_DIR/.git" ] || [ -f "$LLAMA_DIR/CMakeLists.txt" ]; then
@@ -48,11 +32,8 @@ jobs:
             echo "[llama.cpp] cloning $LLAMA_TAG into $LLAMA_DIR"
             git clone --depth=1 --branch "$LLAMA_TAG" \
               https://github.com/ggerganov/llama.cpp.git "$LLAMA_DIR"
-            # Drop the .git directory so the cache key (which hashes cpp/**)
-            # stays stable across runs and so Gradle does not try to track it.
             rm -rf "$LLAMA_DIR/.git"
           fi
-          echo "[llama.cpp] HEAD layout:"
           ls "$LLAMA_DIR" | head -20
           test -f "$LLAMA_DIR/CMakeLists.txt" || { echo "ERROR: llama.cpp CMakeLists.txt missing" >&2; exit 1; }
           test -d "$LLAMA_DIR/tools/mtmd"     || { echo "ERROR: llama.cpp tools/mtmd missing" >&2; exit 1; }
@@ -65,24 +46,15 @@ jobs:
           java-version: 17
 
       # ── 3. NDK 27.1.12297006 ──────────────────────────────────────────────────
-      # actions/setup-android-ndk is not available; the NDK must be installed via
-      # sdkmanager, which ships with the ubuntu-24.04 runner.
       - name: Install NDK 27.1.12297006
         run: |
+          set -x
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
             "ndk;27.1.12297006" \
             "cmake;3.22.1" \
-            --sdk_root="$ANDROID_SDK_ROOT" 2>/dev/null
+            --sdk_root="$ANDROID_SDK_ROOT" 2>&1 | tail -50
 
       # ── 4. Host build-time dependencies ───────────────────────────────────────
-      # libvulkan-dev: provides glslc via shaderc — required to compile the
-      #   GLSL shaders for ggml-vulkan.cpp at build time.
-      # spirv-headers: provides /usr/include/spirv/unified1/spirv.hpp which
-      #   ggml-vulkan.cpp:28 includes ("spirv/unified1/spirv.hpp"). Without
-      #   this package the NDK compile fails with "fatal error: file not found"
-      #   even though glslc is on PATH.
-      # python3: required by GGML_OPENCL_EMBED_KERNELS=ON to embed .cl kernel
-      #   sources as C string literals (so no runtime file I/O on Android).
       - name: Install build-time dependencies (glslc + SPIRV-Headers + Python3)
         run: |
           sudo apt-get update -qq
@@ -92,9 +64,7 @@ jobs:
             spirv-headers \
             python3
 
-      # ── 5. Add glslc to PATH ───────────────────────────────────────────────────
-      # glslc ships with the NDK and also with the shaderc package. We prefer
-      # the NDK's own glslc so it exactly matches the NDK ABI.
+      # ── 5. Add glslc to PATH ──────────────────────────────────────────────────
       - name: Add NDK glslc to PATH
         run: |
           NDK_DIR="$ANDROID_SDK_ROOT/ndk/27.1.12297006"
@@ -108,7 +78,71 @@ jobs:
           which glslc || true
           glslc --version || true
 
-      # ── 6. Gradle cache ───────────────────────────────────────────────────────
+      # ── 6. Pre-build environment dump ────────────────────────────────────────
+      # Capture EVERYTHING about the build host so a failed run can be diagnosed
+      # offline without re-running CI. Saved as part of the build-logs artifact.
+      - name: Diagnostics — pre-build environment
+        if: always()
+        run: |
+          mkdir -p android/build/diagnostics
+          OUT=android/build/diagnostics/00_environment.txt
+          {
+            echo "============================================================"
+            echo " ARIA build host diagnostics — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "============================================================"
+            echo
+            echo "--- runner ---"
+            uname -a
+            cat /etc/os-release 2>/dev/null | head -10
+            echo
+            echo "--- cpu / mem / disk ---"
+            nproc
+            grep -E '^model name|^cpu MHz' /proc/cpuinfo | head -4
+            free -h
+            df -h /
+            echo
+            echo "--- toolchain versions ---"
+            echo "## java"
+            java -version 2>&1
+            echo "## javac"
+            javac -version 2>&1
+            echo "## gradle wrapper"
+            (cd android && ./gradlew --version 2>&1) | head -20
+            echo "## kotlinc (best-effort)"
+            kotlinc -version 2>&1 || echo "kotlinc not on PATH (Gradle uses bundled)"
+            echo "## glslc"
+            glslc --version 2>&1 | head -10 || true
+            echo "## cmake"
+            $ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake --version 2>&1 | head -5 || cmake --version
+            echo "## ninja"
+            ninja --version 2>&1 || true
+            echo "## python3"
+            python3 --version 2>&1
+            echo
+            echo "--- android sdk / ndk ---"
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+            echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+            ls $ANDROID_SDK_ROOT/ndk/ 2>&1
+            ls $ANDROID_SDK_ROOT/cmake/ 2>&1
+            ls $ANDROID_SDK_ROOT/build-tools/ 2>&1
+            ls $ANDROID_SDK_ROOT/platforms/ 2>&1
+            echo
+            echo "--- env ---"
+            env | grep -E '^(JAVA|ANDROID|NDK|GRADLE|PATH)=' | sort
+            echo
+            echo "--- llama.cpp head ---"
+            (cd android/app/src/main/cpp/llama.cpp && \
+              echo "files: $(ls | wc -l)" && \
+              cat CMakeLists.txt | head -3 && \
+              ls tools/mtmd/ 2>&1 | head -10)
+            echo
+            echo "--- repo state ---"
+            git --no-pager log -3 --oneline 2>&1
+            git --no-pager status -s 2>&1 | head -50
+          } > $OUT 2>&1
+          echo "wrote $OUT ($(wc -l < $OUT) lines)"
+
+      # ── 7. Gradle cache ───────────────────────────────────────────────────────
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -118,10 +152,7 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # ── 7. NDK build output cache (.cxx) ─────────────────────────────────────
-      # The llama.cpp NDK build (arm64-v8a) takes ~15 min on a cold runner.
-      # Caching the Gradle CMake output directory cuts rebuilds to ~3 min for
-      # source-only changes (only the changed translation units are recompiled).
+      # ── 8. NDK build output cache (.cxx) ─────────────────────────────────────
       - name: Cache NDK .cxx build output
         uses: actions/cache@v4
         with:
@@ -129,33 +160,114 @@ jobs:
           key: ndk-cxx-${{ runner.os }}-${{ hashFiles('android/app/src/main/cpp/**', 'android/app/src/main/cpp/llama.cpp/src/**', 'android/app/src/main/cpp/llama.cpp/ggml/src/**') }}
           restore-keys: ndk-cxx-${{ runner.os }}-
 
-      # ── 8. Make Gradle wrapper executable ─────────────────────────────────────
+      # ── 9. Make Gradle wrapper executable ─────────────────────────────────────
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
 
-      # ── 9. Build debug APK ────────────────────────────────────────────────────
-      # NATIVE_ONLY mode: no node_modules → settings.gradle auto-disables RN.
-      # -Pandroid.native-only=true is a belt-and-suspenders signal to skip RN.
-      # Gradle is invoked from the android/ subdirectory (not the repo root).
+      # ── 10. Build debug APK with FULL diagnostic verbosity ───────────────────
+      # Flag rationale:
+      #   --info             promotes [INFO] level messages (CMake stdout, AGP
+      #                      task durations, dependency resolutions) into the
+      #                      log so a failed build leaves a useful trail.
+      #   --warning-mode all every deprecation, every Gradle warning. Critical
+      #                      because deprecated AGP DSL silently changes
+      #                      semantics in major versions.
+      #   --stacktrace       Java/Kotlin exceptions print full traces.
+      #   --console=plain    no terminal colour codes in the saved log file
+      #                      (would otherwise be unreadable in `cat`).
+      #   --no-daemon        guarantees a clean JVM per run; on a CI runner
+      #                      the daemon costs more than it saves.
+      #   2>&1 | tee         duplicates Gradle stdout into a file we ship
+      #                      as an artifact, so the GH Actions log truncation
+      #                      (4 MB cap per step) can never lose context.
       - name: Assemble debug APK
         working-directory: android
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.1.12297006
-          # Force CMake to find the llama.cpp submodule even if .gitmodules has
-          # a different relative path on the runner.
           LLAMA_SUBMODULE_PATH: app/src/main/cpp/llama.cpp
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
         run: |
+          mkdir -p build/diagnostics
+          set -o pipefail
           ./gradlew assembleDebug \
             --no-daemon \
+            --info \
+            --warning-mode all \
             --stacktrace \
+            --console=plain \
             -Pandroid.native-only=true \
-            -Pndk.path="$ANDROID_NDK_HOME"
+            -Pndk.path="$ANDROID_NDK_HOME" \
+            2>&1 | tee build/diagnostics/10_gradle_assembleDebug.log
 
-      # ── 10. Upload APK artifact ────────────────────────────────────────────────
-      # Download from: Actions tab → latest workflow run → Artifacts section.
-      # Install on device: adb install -r aria-debug.apk
-      #                    or copy to phone and open with Files app.
+      # ── 11. Post-build APK verification ──────────────────────────────────────
+      # Even on green builds, prove the APK contains the libraries we expect.
+      # If libllama-jni.so is missing, the chat falls back to stub mode and the
+      # whole app is hypothetically functional. Failing the build here surfaces
+      # the problem in CI instead of after install.
+      - name: Diagnostics — APK verification
+        if: always()
+        run: |
+          set -x
+          mkdir -p android/build/diagnostics
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          OUT=android/build/diagnostics/20_apk_contents.txt
+          BADGING=android/build/diagnostics/21_apk_badging.txt
+          MANIFEST=android/build/diagnostics/22_apk_manifest.txt
+          if [ ! -f "$APK" ]; then
+            echo "APK missing at $APK — build did not produce it" | tee $OUT
+            exit 0
+          fi
+          ls -la "$APK"
+
+          # All entries in the APK, sorted by uncompressed size.
+          cat > /tmp/list_apk.py <<'PY'
+          import sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1])
+          rows = sorted(((i.file_size, i.compress_size, i.filename) for i in z.infolist()),
+                        key=lambda r: -r[0])
+          print(f"{'uncompressed':>13} {'compressed':>13}  name")
+          print("-" * 80)
+          for u, c, n in rows:
+              print(f"{u:>13} {c:>13}  {n}")
+          print()
+          print(f"total entries: {len(rows)}")
+          print("native libs:")
+          for u, c, n in rows:
+              if n.endswith('.so'):
+                  print(f"  {u:>11} bytes  {n}")
+          PY
+          # heredoc body has YAML's leading 10 spaces — strip them before running.
+          sed -i 's/^          //' /tmp/list_apk.py
+          python3 /tmp/list_apk.py "$APK" > $OUT
+          echo "wrote $OUT"
+
+          # aapt2 dump badging — package, versionCode, permissions, features.
+          AAPT2="$ANDROID_SDK_ROOT/build-tools/$(ls $ANDROID_SDK_ROOT/build-tools | sort -V | tail -1)/aapt2"
+          if [ -x "$AAPT2" ]; then
+            "$AAPT2" dump badging "$APK" > $BADGING 2>&1 || true
+            "$AAPT2" dump xmltree "$APK" --file AndroidManifest.xml > $MANIFEST 2>&1 || true
+          fi
+
+          # FAIL THE BUILD if libllama-jni.so is not present in arm64-v8a.
+          if grep -q 'lib/arm64-v8a/libllama-jni.so' $OUT; then
+            echo "OK: libllama-jni.so present in arm64-v8a"
+          else
+            echo "FATAL: libllama-jni.so is NOT present in the APK." >&2
+            echo "       The chat will fall back to stub mode on this build." >&2
+            grep -E 'lib/arm64-v8a/.*\.so' $OUT || true
+            exit 1
+          fi
+
+          # Soft-warn if other expected libs are missing (don't fail).
+          for lib in libllama.so libllama-common.so libggml-base.so libggml-cpu.so libmtmd.so; do
+            if ! grep -q "lib/arm64-v8a/$lib" $OUT; then
+              echo "WARN: lib/arm64-v8a/$lib missing"
+            fi
+          done
+
+      # ── 12. Upload APK artifact ───────────────────────────────────────────────
       - name: Upload debug APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: aria-debug-apk
@@ -163,12 +275,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # ── 11. Upload build logs (always — success OR failure) ───────────────────
-      # We want logs from successful builds too: warnings, deprecation notices,
-      # and "soft" CMake messages are otherwise invisible after the run ends.
-      # The on-failure-only path used to mean every flaky build had to be
-      # re-run with --info to diagnose, costing 15+ minutes per attempt.
-      - name: Upload CMake / NDK logs (always)
+      # ── 13. Upload EVERY log we can grab (always — success OR failure) ──────
+      # Greatly expanded vs the previous workflow:
+      #   - .cxx/                              CMake server logs, build_command.txt
+      #   - intermediates/cmake/               per-ABI cmake configure outputs
+      #   - intermediates/incremental/         AGP packaging diffs
+      #   - intermediates/merged_*             merged manifests, resources
+      #   - intermediates/dex/                 DEX merge logs
+      #   - reports/                           lint / test reports
+      #   - diagnostics/                       our new dumps (env, gradle log, APK contents)
+      #   - kotlin-daemon logs (where present)
+      - name: Upload build logs (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -176,7 +293,14 @@ jobs:
           path: |
             android/app/.cxx/
             android/app/build/intermediates/cmake/
+            android/app/build/intermediates/incremental/
+            android/app/build/intermediates/merged_manifests/
+            android/app/build/intermediates/merged_assets/
+            android/app/build/intermediates/dex/
             android/app/build/reports/
             android/build/reports/
-          retention-days: 7
+            android/build/diagnostics/
+            android/build/kotlin/
+            ~/.gradle/daemon/**/daemon-*.out.log
+          retention-days: 14
           if-no-files-found: ignore

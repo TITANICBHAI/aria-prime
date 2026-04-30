@@ -28,6 +28,7 @@ This document is the index. Each layer has its own short reference below.
 │    CrashHandler         JVM Thread.UncaughtExceptionHandler → crashes/       │
 │    AnrWatchdog          main-thread watchdog → anr/                          │
 │    LogcatCollector      `logcat -d` snapshot helper → logcat/                │
+│    LogcatStreamer       continuous `logcat` tail → logcat-stream/            │
 │    NativeCrashHandler   Kotlin facade for the native signal handler          │
 │    StrictModeInstaller  debug-only invariants (disk on UI, leaks)            │
 │    LogManager           install/teardown for the whole stack                 │
@@ -51,6 +52,7 @@ tree at `getExternalFilesDir(null)/logs/`:
 | `anr/anr-<ts>.txt` | `AnrWatchdog` | main thread blocked > 5 s, all threads captured |
 | `native_crashes/native-crash-<epoch>-<tid>.txt` | `aria_crash_handler.cpp` | signal name, registers, backtrace |
 | `logcat/logcat-<ts>.txt` | `LogcatCollector.snapshot()` | filtered `logcat -d` snapshot |
+| `logcat-stream/current.log`, `current.log.1` … `.5` | `LogcatStreamer` (continuous tail of `main system crash events` buffers, threadtime format) | one logcat line per file line, 8 MB rotation, max 5 files (40 MB cap) |
 
 **No root and no special permissions are needed.** This directory is the app's
 external-files dir, which is writable by the app and readable by ADB and by

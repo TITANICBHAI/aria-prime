@@ -47,6 +47,8 @@ object LogManager {
         private set
     lateinit var logcat: LogcatCollector
         private set
+    lateinit var logcatStream: LogcatStreamer
+        private set
     lateinit var anrWatchdog: AnrWatchdog
         private set
 
@@ -77,6 +79,13 @@ object LogManager {
         // Initial snapshot — captures whatever was in the ring buffer before
         // we started writing app.log, so a "view logs" UI can show context.
         logcat.snapshot(tagFilter = "ARIA:V *:W")
+
+        // Continuous tail of `logcat -b main,system,crash,events` to disk.
+        // Captures EVERY line our process logs (and, on debug builds with
+        // READ_LOGS granted via ADB, every line system-wide). Files rotate
+        // at 8 MB × 5 = 40 MB total cap, so this never grows unboundedly.
+        logcatStream = LogcatStreamer(logDir)
+        logcatStream.start()
 
         if (debugBuild) StrictModeInstaller.install()
     }
@@ -112,6 +121,7 @@ object LogManager {
     fun flushAndShutdown() {
         if (!installed) return
         AriaLog.i(TAG, "===== ARIA log subsystem shutting down =====")
+        try { logcatStream.stop() } catch (_: Exception) {}
         anrWatchdog.stop()
         fileWriter.shutdown()
         AriaLog.detachFileSink()
