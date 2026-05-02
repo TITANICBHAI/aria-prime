@@ -165,7 +165,8 @@ fun GoalsScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        tab.label,
+                        // Round 17 §116: show live queue count on the Queue tab label.
+                        if (tab == GoalsTab.Queue && taskQueue.isNotEmpty()) "${tab.label} (${taskQueue.size})" else tab.label,
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = if (selected) ARIAColors.Primary else ARIAColors.Muted,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
@@ -526,14 +527,35 @@ private fun TemplatesTab(
         // ── Recently completed (only shown when the agent has finished at least one task) ──
         if (recentGoals.isNotEmpty()) {
             Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
-                Text(
-                    "RECENTLY COMPLETED",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = ARIAColors.Muted,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        letterSpacing = 1.sp,
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        "RECENTLY COMPLETED",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            letterSpacing = 1.sp,
+                        )
                     )
-                )
+                    // Round 17 §112: count badge for recently-completed goals.
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(ARIAColors.Primary.copy(alpha = 0.15f))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            "${recentGoals.size}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color      = ARIAColors.Primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize   = 9.sp,
+                            )
+                        )
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 androidx.compose.foundation.lazy.LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

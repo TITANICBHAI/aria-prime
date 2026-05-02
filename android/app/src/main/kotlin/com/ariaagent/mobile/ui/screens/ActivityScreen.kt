@@ -533,9 +533,16 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
         }
         // Round 16 §99: edge-case filter chip.
         var showEdgeCasesOnly by remember { mutableStateOf(false) }
+        // Round 17 §109: memory search bar — filter entries by app package or summary text.
+        var memSearch by remember { mutableStateOf("") }
         val edgeCaseCount = remember(entries) { entries.count { it.isEdgeCase } }
-        val displayEntries = remember(entries, showEdgeCasesOnly) {
-            if (showEdgeCasesOnly) entries.filter { it.isEdgeCase } else entries
+        val displayEntries = remember(entries, showEdgeCasesOnly, memSearch) {
+            var result = if (showEdgeCasesOnly) entries.filter { it.isEdgeCase } else entries
+            if (memSearch.isNotBlank()) result = result.filter {
+                it.app.contains(memSearch, ignoreCase = true) ||
+                it.summary.contains(memSearch, ignoreCase = true)
+            }
+            result
         }
         LazyColumn(
             modifier        = Modifier.fillMaxSize(),

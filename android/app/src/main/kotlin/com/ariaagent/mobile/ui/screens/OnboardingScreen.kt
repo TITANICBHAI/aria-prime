@@ -105,6 +105,13 @@ fun OnboardingScreen(
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Round 17 §105: thin progress bar across the top showing overall onboarding completion.
+            LinearProgressIndicator(
+                progress  = { if (ONBOARDING_STEPS.size > 1) currentStep.toFloat() / (ONBOARDING_STEPS.size - 1).toFloat() else 1f },
+                modifier  = Modifier.fillMaxWidth().height(3.dp),
+                color     = ARIAColors.Primary,
+                trackColor = ARIAColors.SurfaceVariant,
+            )
             Spacer(Modifier.height(60.dp))
 
             // ── Step indicator dots ───────────────────────────────────────────

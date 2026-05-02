@@ -656,11 +656,24 @@ private fun LoraHistoryCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically,
         ) {
-            Text(
-                "${checkpoints.size} adapter${if (checkpoints.size != 1) "s" else ""} on disk",
-                color    = ARIAColors.TextMuted,
-                fontSize = 12.sp,
-            )
+            Column {
+                Text(
+                    "${checkpoints.size} adapter${if (checkpoints.size != 1) "s" else ""} on disk",
+                    color    = ARIAColors.TextMuted,
+                    fontSize = 12.sp,
+                )
+                // Round 17 §106: total LoRA adapter storage on disk.
+                if (checkpoints.isNotEmpty()) {
+                    val totalKb = checkpoints.sumOf { it.sizeKb }
+                    Text(
+                        if (totalKb >= 1024) "${"%.1f".format(totalKb / 1024.0)} MB total"
+                        else "$totalKb KB total",
+                        color      = ARIAColors.Accent,
+                        fontSize   = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            }
             IconButton(onClick = onRefresh, modifier = androidx.compose.ui.Modifier.size(28.dp)) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = ARIAColors.TextMuted, modifier = androidx.compose.ui.Modifier.size(14.dp))
             }

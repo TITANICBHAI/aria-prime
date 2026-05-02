@@ -73,6 +73,7 @@ data class AgentUiState(
     val stepCount: Int               = 0,
     val lastAction: String           = "",
     val lastError: String            = "",
+    val lastErrorAt: Long            = 0L,
     val gameMode: String             = "none",
     val tokenRate: Double            = 0.0,
     val modelReady: Boolean          = false,
@@ -833,6 +834,8 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             stepCount   = (data["stepCount"] as? Int) ?: prev.stepCount,
             lastAction  = data["lastAction"]  as? String ?: prev.lastAction,
             lastError   = data["lastError"]   as? String ?: prev.lastError,
+            // Round 17 §115: record timestamp when an error occurs for Dashboard display.
+            lastErrorAt = if (status == "error") System.currentTimeMillis() else prev.lastErrorAt,
             gameMode    = data["gameMode"]    as? String ?: prev.gameMode,
         )}
         if (status == "idle" || status == "done" || status == "error") {

@@ -199,6 +199,19 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
             }
 
             if (agentState.status == "running") {
+                // Round 17 §107: last LLM action preview while agent is running.
+                if (agentState.lastAction.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "↳ ${agentState.lastAction.take(60)}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color      = ARIAColors.Muted,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize   = 9.sp,
+                        ),
+                        maxLines = 1,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 StepActivityBar(activity = stepState.activity, stepNumber = stepState.stepNumber)
             }
@@ -214,7 +227,18 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                             fontFamily = FontFamily.Monospace,
                             fontSize   = 9.sp
                         ),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+                // Round 17 §115: show timestamp when last error occurred.
+                if (agentState.lastErrorAt > 0L) {
+                    Text(
+                        "at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(agentState.lastErrorAt))}",
+                        style    = MaterialTheme.typography.labelSmall.copy(
+                            color    = ARIAColors.Muted,
+                            fontSize = 9.sp,
+                        ),
+                        modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
                 Row(

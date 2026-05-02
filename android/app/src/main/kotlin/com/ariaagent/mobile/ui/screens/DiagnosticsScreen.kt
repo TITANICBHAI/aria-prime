@@ -271,6 +271,8 @@ fun DiagnosticsScreen(
             val context = LocalContext.current
             var crashLines by remember { mutableStateOf<List<String>>(emptyList()) }
             var logExpanded by remember { mutableStateOf(false) }
+            // Round 17 §111: search/filter for the inline log viewer.
+            var logFilter by remember { mutableStateOf("") }
 
             LaunchedEffect(Unit) {
                 crashLines = withContext(Dispatchers.IO) { readLastLogLines(context, 60) }

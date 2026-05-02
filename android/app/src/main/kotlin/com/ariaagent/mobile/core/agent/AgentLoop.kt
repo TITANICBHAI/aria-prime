@@ -1013,6 +1013,11 @@ object AgentLoop {
                     extractTool(actionJson)?.let { t ->
                         actionToolHistory.add(t)
                         currentActionTools = actionToolHistory.toList()
+                        // Round 17 §110: inject diversity hint when the same tool is called 3 consecutive times.
+                        val recentTools = actionToolHistory.takeLast(3)
+                        if (recentTools.size == 3 && recentTools.all { it == recentTools[0] } && stuckHint.isBlank()) {
+                            stuckHint = "You called '$t' three consecutive times with no apparent progress. Try a different tool or approach to move forward."
+                        }
                     }
 
                     // ── Phase 14.4: Log step to progress.txt ──────────────────

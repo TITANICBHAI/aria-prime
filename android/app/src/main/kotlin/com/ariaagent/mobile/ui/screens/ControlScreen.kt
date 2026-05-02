@@ -850,6 +850,20 @@ fun ControlScreen(
                 }
             }
 
+            // Round 17 §108: estimated queue wait time (rough: tasks × 2 min avg).
+            if (taskQueue.isNotEmpty()) {
+                val estMins = taskQueue.size * 2
+                Text(
+                    "Est. ~${estMins}m wait  (${taskQueue.size} task${if (taskQueue.size == 1) "" else "s"} × ~2m avg)",
+                    style    = MaterialTheme.typography.labelSmall.copy(
+                        color      = ARIAColors.Muted,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize   = 9.sp,
+                    ),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                )
+            }
+
             Spacer(Modifier.height(10.dp))
 
             // ── Separate queue-goal + queue-app fields ──────────────────────
@@ -874,6 +888,23 @@ fun ControlScreen(
                 keyboardActions = KeyboardActions(onNext = { focusManager.clearFocus() }),
                 maxLines = 2,
             )
+            // Round 17 §113: character count under the queue-goal field — matches §100 UX for direct goal.
+            if (queueGoal.isNotBlank()) {
+                Text(
+                    "${queueGoal.length} / 200",
+                    style    = MaterialTheme.typography.labelSmall.copy(
+                        color      = when {
+                            queueGoal.length >= 200 -> ARIAColors.Destructive
+                            queueGoal.length >= 160 -> ARIAColors.Warning
+                            else                    -> ARIAColors.Muted
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize   = 9.sp,
+                    ),
+                    modifier  = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End,
+                )
+            }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = queueApp,
