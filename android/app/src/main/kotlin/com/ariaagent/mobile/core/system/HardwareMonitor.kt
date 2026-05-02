@@ -2,6 +2,9 @@ package com.ariaagent.mobile.core.system
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -29,16 +32,18 @@ object HardwareMonitor {
     /**
      * Snapshot of one hardware poll cycle.
      *
-     * @param cpuPercent  0-100  (estimated user+sys CPU %)
-     * @param ramUsedMb   RAM currently used in MB
-     * @param ramTotalMb  Total device RAM in MB
-     * @param gpuPercent  0-100 if readable from sysfs, -1 otherwise
+     * @param cpuPercent    0-100  (estimated user+sys CPU %)
+     * @param ramUsedMb     RAM currently used in MB
+     * @param ramTotalMb    Total device RAM in MB
+     * @param gpuPercent    0-100 if readable from sysfs, -1 otherwise
+     * @param batteryPercent 0-100 from BatteryManager, -1 if unavailable
      */
     data class HardwareStats(
-        val cpuPercent:  Int = 0,
-        val ramUsedMb:   Int = 0,
-        val ramTotalMb:  Int = 0,
-        val gpuPercent:  Int = -1,
+        val cpuPercent:     Int = 0,
+        val ramUsedMb:      Int = 0,
+        val ramTotalMb:     Int = 0,
+        val gpuPercent:     Int = -1,
+        val batteryPercent: Int = -1,
     ) {
         val ramPercent: Int
             get() = if (ramTotalMb > 0) (ramUsedMb * 100 / ramTotalMb).coerceIn(0, 100) else 0
@@ -119,6 +124,23 @@ object HardwareMonitor {
         File(path).readText().trim().toIntOrNull()?.coerceIn(0, 100) ?: -1
     }.getOrDefault(-1)
 
+    // ── Battery helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Read battery level (0–100) via sticky broadcast.
+     * Returns -1 if the intent is unavailable (e.g. first boot, emulator).
+     */
+    private fun batteryLevel(context: Context): Int = try {
+        val intent = context.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        ) ?: return -1
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (level < 0 || scale <= 0) -1
+        else (level * 100 / scale).coerceIn(0, 100)
+    } catch (_: Exception) { -1 }
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /**
@@ -133,14 +155,16 @@ object HardwareMonitor {
             val stat1 = readProcStat()
             delay(500L)                       // let CPU counter advance
             val stat2 = readProcStat()
-            val cpu   = if (stat1 != null && stat2 != null) cpuPercent(stat1, stat2) else 0
+            val cpu     = if (stat1 != null && stat2 != null) cpuPercent(stat1, stat2) else 0
             val (usedMb, totalMb) = ramStats(context)
-            val gpu  = gpuPercent()
+            val gpu     = gpuPercent()
+            val battery = batteryLevel(context)
             emit(HardwareStats(
-                cpuPercent  = cpu,
-                ramUsedMb   = usedMb,
-                ramTotalMb  = totalMb,
-                gpuPercent  = gpu,
+                cpuPercent     = cpu,
+                ramUsedMb      = usedMb,
+                ramTotalMb     = totalMb,
+                gpuPercent     = gpu,
+                batteryPercent = battery,
             ))
             delay((intervalMs - 500L).coerceAtLeast(100L))
         }

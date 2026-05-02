@@ -45,13 +45,55 @@ import com.ariaagent.mobile.ui.viewmodel.SafetyConfig
 
 private val SENSITIVE_APP_PRESETS = listOf(
     Triple("Banking & Finance",  Icons.Default.AccountBalance,
-        listOf("com.chase.sig.android", "com.bankofamerica.digitalwallet", "com.wellsfargo.mobile", "com.citi.mobile", "com.venmo", "com.paypal.android.p2pmobile")),
+        listOf(
+            "com.chase.sig.android", "com.bankofamerica.digitalwallet",
+            "com.wellsfargo.mobile", "com.citi.mobile",
+            "com.venmo", "com.paypal.android.p2pmobile",
+            "com.usaa.mobile.android.usaa", "com.tdbank",
+            "com.capitalone.mobile", "com.ally.mobile",
+            "com.schwab.mobile", "com.fidelity.android",
+        )),
     Triple("Medical & Health",   Icons.Default.LocalHospital,
-        listOf("com.epic.mychart.android", "com.dexcom.g6", "com.medtronic.sync", "com.withings.wiscale2")),
+        listOf(
+            "com.epic.mychart.android", "com.dexcom.g6",
+            "com.medtronic.sync", "com.withings.wiscale2",
+            "com.kardia.mobile", "com.omada.health",
+            "com.castlighthealth.app", "com.aetna.member",
+        )),
     Triple("Passwords & Auth",   Icons.Default.Lock,
-        listOf("com.lastpass.lpandroid", "com.onepassword.android", "com.google.android.apps.authenticator2", "org.keepass2android.keepass2android")),
+        listOf(
+            "com.lastpass.lpandroid", "com.onepassword.android",
+            "com.google.android.apps.authenticator2", "org.keepass2android.keepass2android",
+            "com.dashlane", "com.bitwarden.mobile",
+            "com.authy.authy", "com.microsoft.authenticator",
+        )),
     Triple("Work & Enterprise",  Icons.Default.Work,
-        listOf("com.microsoft.intune.mam.managedbrowser", "com.microsoft.teams", "com.slack", "com.zoom.us")),
+        listOf(
+            "com.microsoft.intune.mam.managedbrowser", "com.microsoft.teams",
+            "com.slack", "com.zoom.us",
+            "com.cisco.webex.meetings", "com.box.android",
+            "com.dropbox.android", "com.workday.android",
+        )),
+    Triple("Crypto & Investing",  Icons.Default.ShowChart,
+        listOf(
+            "com.coinbase.android", "com.kraken.invest.app",
+            "com.binance.dev", "com.robinhood.android",
+            "com.etrade.mobile", "com.webull.amer",
+            "com.sofi.mobile", "piuk.blockchain.android",
+        )),
+    Triple("Email & Cloud Storage", Icons.Default.Email,
+        listOf(
+            "com.google.android.gm", "com.microsoft.office.outlook",
+            "com.protonmail.protonmail", "com.fastmail.app",
+            "com.google.android.apps.docs", "com.microsoft.skydrive",
+            "com.box.android.storage", "com.apple.android.music",
+        )),
+    Triple("Government & ID",    Icons.Default.Badge,
+        listOf(
+            "com.ssa.mobileapp", "gov.irs2go",
+            "com.cbp.onemobile", "com.tsa.precheck",
+            "com.myca.stateidapp", "com.dmv.aamva",
+        )),
 )
 
 @Composable

@@ -148,11 +148,12 @@ class AgentForegroundService : Service() {
 
     // ── Auto-recovery watchdog ────────────────────────────────────────────────
     // When the agent loop crashes (status = "error"), automatically retry up to
-    // MAX_AUTO_RETRIES times with a 5-second cool-down between attempts.
+    // MAX_AUTO_RETRIES times with exponential back-off (2s, 4s, 8s).
     // Resets to 0 on every successful "done" or user-initiated start.
     private var autoRetryCount = 0
-    private val MAX_AUTO_RETRIES = 3
-    private val RETRY_DELAY_MS   = 5_000L
+    private val MAX_AUTO_RETRIES        = 3
+    private val RETRY_BASE_DELAY_MS     = 2_000L   // 2s × 2^attempt: 2s, 4s, 8s
+    private val RETRY_MAX_DELAY_MS      = 30_000L  // hard cap
 
     // FLAWS.md #6 — the retry coroutine is launched **separately** from the
     // bus collector so a 5-second cool-down does not block the whole event
@@ -301,15 +302,21 @@ class AgentForegroundService : Service() {
                                     currentGoal.isNotBlank()
                                 ) {
                                     autoRetryCount++
-                                    val attempt = autoRetryCount
-                                    updateNotification("Error: $err — retrying ($attempt/$MAX_AUTO_RETRIES)…")
+                                    val attempt   = autoRetryCount
+                                    // Exponential back-off: 2s, 4s, 8s … capped at 30s
+                                    val delayMs   = (RETRY_BASE_DELAY_MS shl (attempt - 1))
+                                        .coerceAtMost(RETRY_MAX_DELAY_MS)
+                                    updateNotification(
+                                        "Error: $err — retrying in ${delayMs / 1000}s ($attempt/$MAX_AUTO_RETRIES)…"
+                                    )
+                                    Log.w(TAG, "Auto-recovery: attempt $attempt — waiting ${delayMs}ms then restart")
                                     // Cancel any prior in-flight retry (rare but possible
                                     // if the loop emits two errors in quick succession).
                                     pendingRetryJob?.cancel()
                                     pendingRetryJob = serviceScope.launch {
                                         // Wait off-thread so the bus collector keeps
                                         // pumping events (e.g. user-initiated STOP).
-                                        delay(RETRY_DELAY_MS)
+                                        delay(delayMs)
                                         if (stopRequested) {
                                             Log.i(TAG, "Auto-recovery attempt $attempt cancelled — stop requested")
                                             return@launch

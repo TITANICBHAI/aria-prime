@@ -40,6 +40,8 @@ object LocalSnapshotStore {
         put("accessibilityActive", false)
         put("screenCaptureActive", false)
         put("gameMode",            "none")
+        put("batteryPercent",      -1)
+        put("uptimeSec",           0L)
     }
 
     private fun defaultThermal() = JSONObject().apply {

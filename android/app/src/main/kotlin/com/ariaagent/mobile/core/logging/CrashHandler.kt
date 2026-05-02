@@ -1,7 +1,12 @@
 package com.ariaagent.mobile.core.logging
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
+import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -34,25 +39,36 @@ import java.util.Locale
  */
 object CrashHandler {
 
-    private const val TAG = "CrashHandler"
+    private const val TAG              = "CrashHandler"
+    private const val NOTIF_CHANNEL_ID = "aria_crash"
+    private const val NOTIF_ID         = 0xCE4A
     private val ts = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
 
     @Volatile private var installed = false
-    private lateinit var crashDir: File
+    private lateinit var crashDir:   File
+    private lateinit var appContext: Context
     private var previous: Thread.UncaughtExceptionHandler? = null
 
     fun install(context: Context, baseLogDir: File) {
         if (installed) return
-        installed = true
-        crashDir = File(baseLogDir, "crashes").apply { mkdirs() }
+        installed   = true
+        appContext  = context.applicationContext
+        crashDir    = File(baseLogDir, "crashes").apply { mkdirs() }
+
+        ensureNotificationChannel(context.applicationContext)
 
         previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                val payload = buildPayload(context, thread, throwable)
-                writeFile(payload, thread)
+                val payload  = buildPayload(context, thread, throwable)
+                val crashFile = writeFile(payload, thread)
                 AriaLog.wtf(TAG, "uncaught on ${thread.name}", throwable)
                 AriaLog.detachFileSink() // flush before the process is killed
+                // Post a notification so the user sees the crash in the shade.
+                // Best-effort — never throw here.
+                try {
+                    postCrashNotification(appContext, throwable, crashFile)
+                } catch (_: Throwable) {}
             } catch (_: Throwable) {
                 // Never fail in the crash handler.
             } finally {
@@ -100,9 +116,62 @@ object CrashHandler {
         return sw.toString()
     }
 
-    private fun writeFile(payload: String, thread: Thread) {
+    private fun writeFile(payload: String, thread: Thread): File {
         val safeName = thread.name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(40)
         val file = File(crashDir, "crash-${ts.format(Date())}-$safeName.txt")
         file.writeText(payload)
+        return file
+    }
+
+    // ─── Notification helpers ────────────────────────────────────────────────
+
+    private fun ensureNotificationChannel(ctx: Context) {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+        if (nm.getNotificationChannel(NOTIF_CHANNEL_ID) != null) return
+        val ch = NotificationChannel(
+            NOTIF_CHANNEL_ID,
+            "ARIA Crash Reports",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Shown when ARIA encounters an uncaught exception"
+        }
+        nm.createNotificationChannel(ch)
+    }
+
+    /**
+     * Posts a high-priority system notification so the user is always aware
+     * a crash occurred. Tapping the notification re-opens the app.
+     * Swallows all exceptions — must never fail inside the crash handler.
+     */
+    private fun postCrashNotification(ctx: Context, t: Throwable, crashFile: File) {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+
+        val launchIntent = ctx.packageManager
+            .getLaunchIntentForPackage(ctx.packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val pi = if (launchIntent != null) {
+            PendingIntent.getActivity(
+                ctx, 0, launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else null
+
+        val title   = "ARIA crashed"
+        val summary = t.javaClass.simpleName + (t.message?.let { ": ${it.take(80)}" } ?: "")
+
+        val notif = NotificationCompat.Builder(ctx, NOTIF_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle(title)
+            .setContentText(summary)
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("$summary\n\nCrash log: ${crashFile.name}"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .apply { if (pi != null) setContentIntent(pi) }
+            .build()
+
+        nm.notify(NOTIF_ID, notif)
     }
 }

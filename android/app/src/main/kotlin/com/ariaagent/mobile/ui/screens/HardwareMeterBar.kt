@@ -30,6 +30,17 @@ private fun meterColor(pct: Int): Color = when {
     else      -> ARIAColors.Error
 }
 
+/**
+ * Inverted color scale for battery: high % = green, low % = red.
+ * ≥50% → green (Success), 20–49% → amber (Warning), <20% → red (Error)
+ */
+private fun batteryColor(pct: Int): Color = when {
+    pct < 0   -> ARIAColors.TextMuted          // unavailable
+    pct < 20  -> ARIAColors.Error
+    pct < 50  -> ARIAColors.Warning
+    else      -> ARIAColors.Success
+}
+
 // ── Single labelled gauge bar ────────────────────────────────────────────────
 
 /**
@@ -154,6 +165,71 @@ fun HardwareMeterRow(
             SingleMeterBar(label = "GPU", pct = stats.gpuPercent, modifier = Modifier.weight(1f))
             SingleMeterBar(label = "RAM", pct = stats.ramPercent, modifier = Modifier.weight(1f))
         }
+        if (stats.batteryPercent >= 0) {
+            BatteryMeterBar(pct = stats.batteryPercent)
+        }
+    }
+}
+
+/**
+ * Dedicated battery bar using inverted color scale (high = green, low = red).
+ * Hidden when batteryPercent < 0 (unavailable / emulator).
+ */
+@Composable
+fun BatteryMeterBar(
+    pct: Int,
+    modifier: Modifier = Modifier,
+    height: Dp = 6.dp,
+) {
+    val clampedPct = pct.coerceIn(0, 100)
+    val color      = batteryColor(pct)
+    val animFrac   by animateFloatAsState(
+        targetValue   = clampedPct / 100f,
+        animationSpec = tween(600),
+        label         = "battery_meter"
+    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Text(
+                "BAT",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color         = ARIAColors.TextSecondary,
+                    fontSize      = 10.sp,
+                    fontFamily    = FontFamily.Monospace,
+                    fontWeight    = FontWeight.Medium,
+                    letterSpacing = 0.8.sp
+                )
+            )
+            Text(
+                "$clampedPct%",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color      = color,
+                    fontSize   = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+        Spacer(Modifier.height(3.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(height / 2))
+                .background(ARIAColors.Surface3)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction = animFrac)
+                    .clip(RoundedCornerShape(height / 2))
+                    .background(color)
+            )
+        }
     }
 }
 
@@ -176,12 +252,15 @@ fun HardwareMiniStrip(
         MiniChip(label = "CPU", pct = stats.cpuPercent)
         MiniChip(label = "GPU", pct = stats.gpuPercent)
         MiniChip(label = "RAM", pct = stats.ramPercent)
+        if (stats.batteryPercent >= 0) {
+            MiniChip(label = "BAT", pct = stats.batteryPercent, invertScale = true)
+        }
     }
 }
 
 @Composable
-private fun MiniChip(label: String, pct: Int) {
-    val color  = meterColor(pct)
+private fun MiniChip(label: String, pct: Int, invertScale: Boolean = false) {
+    val color  = if (invertScale) batteryColor(pct) else meterColor(pct)
     val text   = if (pct < 0) "$label n/a" else "$label ${pct}%"
     Box(
         modifier = Modifier

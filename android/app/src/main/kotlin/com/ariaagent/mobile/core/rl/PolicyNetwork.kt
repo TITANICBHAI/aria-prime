@@ -374,14 +374,42 @@ object PolicyNetwork {
     private fun loadFromBinary(file: File) {
         try {
             DataInputStream(FileInputStream(file)).use { din ->
+                // ── Bounds check each size field before allocating ──────────
+                // A corrupted file can store negative or absurdly large sizes
+                // that cause OOM or invalid array creation. Validate each size
+                // against the expected dimension; fall back to random init on
+                // any mismatch rather than crashing or silently using garbage.
+                val expectedS1 = HIDDEN1 * INPUT_DIM
+                val expectedS2 = HIDDEN2 * HIDDEN1
+                val expectedSO = OUTPUT_DIM * HIDDEN2
+
                 val s1 = din.readInt()
+                if (s1 <= 0 || s1 != expectedS1) {
+                    Log.w(TAG, "Corrupt weights1 size $s1 (expected $expectedS1) — reinitializing")
+                    initRandom()
+                    return
+                }
                 weights1 = FloatArray(s1) { din.readFloat() }
+
                 val s2 = din.readInt()
+                if (s2 <= 0 || s2 != expectedS2) {
+                    Log.w(TAG, "Corrupt weights2 size $s2 (expected $expectedS2) — reinitializing")
+                    initRandom()
+                    return
+                }
                 weights2 = FloatArray(s2) { din.readFloat() }
+
                 val sO = din.readInt()
+                if (sO <= 0 || sO != expectedSO) {
+                    Log.w(TAG, "Corrupt outputW size $sO (expected $expectedSO) — reinitializing")
+                    initRandom()
+                    return
+                }
                 outputW  = FloatArray(sO) { din.readFloat() }
+
                 rewardBaseline = din.readFloat()
-                adamStep = din.readInt()
+                adamStep       = din.readInt()
+
                 // Round 7+: output bias — absent in files written before Round 7
                 outputBias = try {
                     val bSize = din.readInt()

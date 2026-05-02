@@ -1,6 +1,9 @@
 package com.ariaagent.mobile.core.monitoring
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.util.Log
 import com.ariaagent.mobile.core.agent.AgentLoop
 import com.ariaagent.mobile.core.agent.AppSkillRegistry
@@ -129,6 +132,15 @@ object MonitoringPusher {
 
     private fun buildStatus(context: Context): JSONObject {
         val s = AgentLoop.state
+        val battery = try {
+            val intent = context.registerReceiver(
+                null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            )
+            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+            if (level < 0 || scale <= 0) -1 else (level * 100 / scale).coerceIn(0, 100)
+        } catch (_: Exception) { -1 }
+        val uptimeSec = android.os.SystemClock.elapsedRealtime() / 1000L
         return JSONObject().apply {
             put("status",              s.status.name.lowercase())
             put("currentTask",         s.goal.ifBlank { null } ?: JSONObject.NULL)
@@ -144,6 +156,8 @@ object MonitoringPusher {
             put("memoryUsedMb",        Runtime.getRuntime().let {
                 ((it.totalMemory() - it.freeMemory()) / 1_048_576L).toInt()
             })
+            put("batteryPercent",      battery)
+            put("uptimeSec",           uptimeSec)
         }
     }
 
