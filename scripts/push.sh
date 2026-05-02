@@ -15,7 +15,7 @@ fi
 
 git commit -m "$COMMIT_MESSAGE"
 
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+GITHUB_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN:-${GITHUB_TOKEN:-}}"
 if [ -n "$GITHUB_TOKEN" ]; then
   git -c "http.extraheader=Authorization: Bearer ${GITHUB_TOKEN}" push origin main
 else
