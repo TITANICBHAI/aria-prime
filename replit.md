@@ -77,6 +77,18 @@ server/              Python preview server for the Replit workspace
   8. **GAP_AUDIT §11 consistency fix** — `WAKE_LOCK` + `ONNX reflection` rows corrected from `[ ]` → `[x]`, now consistent with Priority table items 12–13.
   9. **LocalDeviceServer NSD** — `stopNsd()` unregisters cleanly on `stop()`. `nsdRegistered: Boolean` volatile flag exposed for module state inspection.
   **Files changed:** `LearningScheduler.kt`, `LocalDeviceServer.kt`, `ControlScreen.kt`, `DiagnosticsScreen.kt`, `SettingsScreen.kt`, `AgentViewModel.kt`, `GAP_AUDIT.md`, `replit.md`. **New:** `SessionStatsUiStateTest.kt`, `SafetyConfigTest.kt`.
+- 2026-05-02 — **Round 12 — closed 10 GAP_AUDIT items (§49–58):**
+  1. **`AgentLoop` consecutive-timeout abort (§49)** — `MAX_CONSECUTIVE_TIMEOUTS=3` constant. `consecutiveTimeouts` counter: reset to 0 on good inference, incremented on timeout. After 3 back-to-back timeouts: `status=ERROR`, `logTaskEnd`, `SustainedPerformanceManager.disable()`, `emitStatus()`, `break`. Prevents infinite spin on wedged JNI model.
+  2. **`step_started` event enriched (§50)** — `"appPackage"` and `"goalText"` fields added to the `step_started` event payload so downstream analytics can correlate steps without additional lookups.
+  3. **`SessionStatsUiState.inferenceTimeoutCount` (§51)** — New `Int` field; incremented by `handleInferenceTimeout()`; reset by `resetSession()`.
+  4. **`AgentViewModel.handleInferenceTimeout()` + dispatch (§52)** — New private handler wired to `"inference_timeout"` in the AgentEventBus `when` table.
+  5. **`AgentViewModel.resetSession()` (§53)** — Clears action logs, session stats (new `sessionStartMs`), token stream, step state. No agent stop.
+  6. **`ControlScreen` "RESET SESSION" button (§54)** — Right-aligned `TextButton` below Start/Stop/Pause row; confirmation `AlertDialog` before clearing.
+  7. **`ActivityScreen` date-filter chips (§55)** — `ActionDateFilter` enum (`ALL`/`TODAY`/`WEEK`). `LazyRow` of `FilterChip`s above the action `LazyColumn`. Count badge shown when filtered.
+  8. **`DiagnosticsScreen` "Clear All" crash button (§56)** — Red `TextButton` in CRASH REPORTS header (visible only when files exist). `AlertDialog` confirmation deletes all files and clears state.
+  9. **`DiagnosticsScreen` progress.txt size chip (§57)** — `ProgressPersistence.logFileSizeBytes(context)` shown as monospace `"X.X KB"` in the ON-DEVICE LOG header row.
+  10. **`DashboardScreen` timeout count in stats footer (§58)** — Footer appends `• N timeout(s)` in amber whenever `inferenceTimeoutCount > 0`; footer visible even before first task completes if timeouts have occurred.
+  **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `SessionStatsUiState` (in ViewModel), `ProgressPersistence.kt`, `ControlScreen.kt`, `ActivityScreen.kt`, `DiagnosticsScreen.kt`, `DashboardScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-02 — **Round 8 — closed/advanced 8 GAP_AUDIT items:**
   1. **`LlamaEngine` stub-mode surface (§9)** — `isStubMode: Boolean` computed property (`!jniAvailable`). `ModuleUiState.isStubMode` wired from it in `refreshModuleState`. `ModulesScreen` shows an amber "STUB MODE — NDK NOT COMPILED" banner when true. Stub `runInference()` now returns keyword-aware JSON (Type/Swipe/Back/Wait/LongPress/Click) via `buildStubResponse()` instead of a hardcoded Click.
   2. **Session stats on Dashboard (new §21)** — `SessionStatsUiState` (tasksCompleted, tasksErrored, totalSteps, successRate, avgStepsPerTask, sessionDurationMinutes) + `_sessionStats: StateFlow`. `handleStatusChanged` increments counters on running→idle/done/error. `DashboardScreen` shows `SessionStatsCard` after first task finishes.

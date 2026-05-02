@@ -583,6 +583,51 @@ fun ControlScreen(
             }
         }
 
+        // ── Round 12: Session reset ───────────────────────────────────────────
+        // Clears the action log, session stats, token stream, and step indicator
+        // without stopping the running agent. Guarded by a confirmation dialog.
+        var showResetConfirm by remember { mutableStateOf(false) }
+        if (showResetConfirm) {
+            AlertDialog(
+                onDismissRequest = { showResetConfirm = false },
+                title   = { Text("Reset session data?", fontWeight = FontWeight.SemiBold) },
+                text    = { Text(
+                    "Clears the action log, session stats, and token stream. " +
+                    "The agent is not stopped — it continues running.",
+                    style = MaterialTheme.typography.bodySmall
+                )},
+                confirmButton = {
+                    TextButton(onClick = { vm.resetSession(); showResetConfirm = false }) {
+                        Text("Reset", color = ARIAColors.Error, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = { showResetConfirm = true },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+            ) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = "Reset session",
+                    modifier = Modifier.size(13.dp),
+                    tint = ARIAColors.Muted
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "RESET SESSION",
+                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+                )
+            }
+        }
+
         // ── Active task display ───────────────────────────────────────────────
         if (agentState.currentTask.isNotBlank()) {
             Row(

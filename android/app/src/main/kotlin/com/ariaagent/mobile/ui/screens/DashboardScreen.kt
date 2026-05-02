@@ -363,16 +363,19 @@ private fun SessionStatsCard(stats: SessionStatsUiState) {
             SessionStat("Steps",   "${stats.totalSteps}")
             SessionStat("Success", "${(stats.successRate * 100).toInt()}%")
         }
-        if (stats.tasksCompleted > 0) {
+        if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {
             Spacer(Modifier.height(6.dp))
-            val avgDurText = if (stats.avgStepDurationMs > 0L) {
-                "  •  ${stats.avgStepDurationMs}ms/step"
-            } else ""
+            val avgDurText = if (stats.avgStepDurationMs > 0L) "  •  ${stats.avgStepDurationMs}ms/step" else ""
+            val timeoutText = if (stats.inferenceTimeoutCount > 0) "  •  ${stats.inferenceTimeoutCount} timeout${if (stats.inferenceTimeoutCount == 1) "" else "s"}" else ""
             Text(
-                "Avg ${String.format("%.1f", stats.avgStepsPerTask)} steps/task" +
-                avgDurText +
+                (if (stats.tasksCompleted > 0)
+                    "Avg ${String.format("%.1f", stats.avgStepsPerTask)} steps/task$avgDurText"
+                else "") +
+                timeoutText +
                 "  •  Session ${stats.sessionDurationMinutes} min",
-                style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = if (stats.inferenceTimeoutCount > 0) ARIAColors.Warning else ARIAColors.Muted
+                )
             )
         }
     }

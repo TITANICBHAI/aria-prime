@@ -110,6 +110,9 @@ object AgentLoop {
     private const val DEAD_NODE_THRESHOLD = 3  // consecutive gesture failures before injecting dead-node hint
     private const val SCREEN_SETTLE_MS = 600L
     private const val WAIT_RETRY_DELAY_MS = 1200L
+    // Round 12: abort the task after this many back-to-back LLM timeouts — prevents
+    // the loop from spinning indefinitely when the model is wedged or OOM-killed by the JVM.
+    private const val MAX_CONSECUTIVE_TIMEOUTS = 3
 
     /**
      * Start the agent loop for a given goal.
@@ -196,6 +199,9 @@ object AgentLoop {
             var lastScreenHash      = ""
             var lastScreenHashFuzzy = ""
             var stuckHint           = ""
+            // Round 12: track consecutive inference timeouts so MAX_CONSECUTIVE_TIMEOUTS
+            // can abort the task rather than looping forever on a wedged model.
+            var consecutiveTimeouts = 0
 
             // ── Dead A11y node tracking (GAP_AUDIT §4) ─────────────────────────
             // If GestureEngine fails on the same nodeId DEAD_NODE_THRESHOLD times
@@ -301,7 +307,9 @@ object AgentLoop {
                     run {
                         val stepData = mapOf(
                             "stepNumber" to state.stepCount,
-                            "activity"   to "observe"
+                            "activity"   to "observe",
+                            "appPackage" to appPackage,
+                            "goalText"   to goal
                         )
                         onEvent?.invoke("step_started", stepData)
                         AgentEventBus.emit("step_started", stepData)
@@ -675,12 +683,26 @@ object AgentLoop {
                         bmp?.recycle()
                     }
                     if (rawOutputNullable == null) {
-                        Log.e("AgentLoop", "LLM inference timed out after ${LLM_INFERENCE_TIMEOUT_MS / 1000}s — skipping step")
-                        ProgressPersistence.logNote(context, "LLM inference timeout — skipping step")
-                        AgentEventBus.emit("inference_timeout", mapOf("stepCount" to state.stepCount))
+                        consecutiveTimeouts++
+                        Log.e("AgentLoop", "LLM inference timed out (×$consecutiveTimeouts) after ${LLM_INFERENCE_TIMEOUT_MS / 1000}s")
+                        ProgressPersistence.logNote(context, "LLM inference timeout ×$consecutiveTimeouts — skipping step")
+                        AgentEventBus.emit("inference_timeout", mapOf(
+                            "stepCount"        to state.stepCount,
+                            "consecutiveCount" to consecutiveTimeouts
+                        ))
+                        if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+                            val errMsg = "inference_timeout_${consecutiveTimeouts}_consecutive"
+                            Log.e("AgentLoop", "Aborting task — $errMsg")
+                            state = state.copy(status = Status.ERROR, lastError = errMsg)
+                            ProgressPersistence.logTaskEnd(context, goal, succeeded = false)
+                            SustainedPerformanceManager.disable()
+                            emitStatus()
+                            break
+                        }
                         delay(STEP_DELAY_MS)
                         continue
                     }
+                    consecutiveTimeouts = 0          // reset on successful inference
                     val rawOutput: String = rawOutputNullable
 
                     // ── 4. PARSE ──────────────────────────────────────────────

@@ -248,12 +248,36 @@ fun DiagnosticsScreen(
                 crashLines = withContext(Dispatchers.IO) { readLastLogLines(context, 60) }
             }
 
-            Text(
-                "ON-DEVICE LOG (last lines)",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = ARIAColors.Accent, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
+            // ── Progress log size chip ───────────────────────────────────────
+            // Round 12: shows the current size of aria_progress.txt on disk so
+            // users can see if it's growing unexpectedly.
+            var progressLogBytes by remember { mutableLongStateOf(0L) }
+            LaunchedEffect(Unit) {
+                progressLogBytes = withContext(Dispatchers.IO) {
+                    com.ariaagent.mobile.core.persistence.ProgressPersistence.logFileSizeBytes(context)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "ON-DEVICE LOG (last lines)",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Accent, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
+                    )
                 )
-            )
+                if (progressLogBytes > 0L) {
+                    Text(
+                        "progress.txt: ${String.format("%.1f", progressLogBytes / 1024.0)} KB",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    )
+                }
+            }
             ARIACard {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(
@@ -302,24 +326,60 @@ fun DiagnosticsScreen(
             }
 
             // ── Crash file list ──────────────────────────────────────────────
-            // Round 11: lists every .txt crash report written by CrashHandler,
-            // one expandable card per file, so engineers can read the full stack
-            // trace without leaving the app or pulling logcat.
+            // Round 11: lists every .txt crash report written by CrashHandler.
+            // Round 12: adds "Clear All" button to delete all crash files at once.
             var crashFiles by remember { mutableStateOf<List<File>>(emptyList()) }
             var expandedCrashFile by remember { mutableStateOf<String?>(null) }
+            var showClearCrashConfirm by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
                 crashFiles = withContext(Dispatchers.IO) { CrashHandler.listCrashes() }
             }
 
-            Text(
-                "CRASH REPORTS (${crashFiles.size})",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = if (crashFiles.isEmpty()) ARIAColors.Muted else ARIAColors.Error,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+            if (showClearCrashConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showClearCrashConfirm = false },
+                    title   = { Text("Clear all crash reports?", fontWeight = FontWeight.SemiBold) },
+                    text    = { Text("Deletes all ${crashFiles.size} crash file(s) from device storage. This cannot be undone.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            crashFiles.forEach { it.delete() }
+                            crashFiles = emptyList()
+                            expandedCrashFile = null
+                            showClearCrashConfirm = false
+                        }) { Text("Delete All", color = ARIAColors.Error, fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showClearCrashConfirm = false }) { Text("Cancel") }
+                    }
                 )
-            )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "CRASH REPORTS (${crashFiles.size})",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = if (crashFiles.isEmpty()) ARIAColors.Muted else ARIAColors.Error,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                )
+                if (crashFiles.isNotEmpty()) {
+                    TextButton(
+                        onClick = { showClearCrashConfirm = true },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "Clear All",
+                            style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Error)
+                        )
+                    }
+                }
+            }
             if (crashFiles.isEmpty()) {
                 ARIACard {
                     Text(

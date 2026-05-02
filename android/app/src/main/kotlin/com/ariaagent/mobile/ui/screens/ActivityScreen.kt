@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -303,22 +305,81 @@ fun ActivityScreen(vm: AgentViewModel = viewModel()) {
 
 // ─── Actions tab ──────────────────────────────────────────────────────────────
 
+// Round 12: date-range filter options for the Actions tab.
+private enum class ActionDateFilter(val label: String) {
+    ALL("All"),
+    TODAY("Today"),
+    WEEK("This week")
+}
+
 @Composable
 private fun ActionsList(logs: List<ActionLogEntry>) {
-    if (logs.isEmpty()) {
-        EmptyState(
-            icon    = Icons.Default.Timeline,
-            title   = "No actions yet",
-            message = "Start the agent to see its actions here"
-        )
-    } else {
-        LazyColumn(
-            modifier        = Modifier.fillMaxSize(),
-            contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp, ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    var dateFilter by remember { mutableStateOf(ActionDateFilter.ALL) }
+    val cutoffMs = remember(dateFilter) {
+        when (dateFilter) {
+            ActionDateFilter.TODAY -> System.currentTimeMillis() - 86_400_000L
+            ActionDateFilter.WEEK  -> System.currentTimeMillis() - 7 * 86_400_000L
+            ActionDateFilter.ALL   -> 0L
+        }
+    }
+    val filtered = remember(logs, dateFilter) {
+        if (dateFilter == ActionDateFilter.ALL) logs
+        else logs.filter { it.timestamp >= cutoffMs }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ── Date filter chip row ────────────────────────────────────────────
+        LazyRow(
+            modifier        = Modifier.fillMaxWidth(),
+            contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(logs, key = { it.id }) { entry ->
-                ActionLogRow(entry = entry)
+            items(ActionDateFilter.entries) { filter ->
+                val selected = filter == dateFilter
+                FilterChip(
+                    selected = selected,
+                    onClick  = { dateFilter = filter },
+                    label    = {
+                        Text(
+                            filter.label,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor    = ARIAColors.Primary.copy(alpha = 0.18f),
+                        selectedLabelColor        = ARIAColors.Primary,
+                        containerColor            = ARIAColors.Surface,
+                        labelColor                = ARIAColors.Muted,
+                    )
+                )
+            }
+            item {
+                if (filtered.size != logs.size) {
+                    Text(
+                        "${filtered.size} / ${logs.size}",
+                        style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted),
+                        modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp)
+                    )
+                }
+            }
+        }
+
+        if (filtered.isEmpty()) {
+            EmptyState(
+                icon    = Icons.Default.Timeline,
+                title   = if (logs.isEmpty()) "No actions yet" else "No actions in this period",
+                message = if (logs.isEmpty()) "Start the agent to see its actions here"
+                          else "Try a wider date range"
+            )
+        } else {
+            LazyColumn(
+                modifier        = Modifier.fillMaxSize(),
+                contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filtered, key = { it.id }) { entry ->
+                    ActionLogRow(entry = entry)
+                }
             }
         }
     }

@@ -253,6 +253,13 @@ object ProgressPersistence {
     }
 
     /**
+     * Return the size in bytes of progress.txt, or 0 if it does not exist.
+     * Safe to call from any thread.
+     */
+    fun logFileSizeBytes(context: Context): Long =
+        File(context.filesDir, PROGRESS_FILE).takeIf { it.exists() }?.length() ?: 0L
+
+    /**
      * Clear both log files. Call when the user explicitly resets the agent.
      */
     fun clear(context: Context) {

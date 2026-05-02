@@ -322,11 +322,12 @@ data class LoraTrainingProgress(
  * Reset when the ViewModel is created (i.e. on app launch).
  */
 data class SessionStatsUiState(
-    val tasksCompleted: Int  = 0,
-    val tasksErrored: Int    = 0,
-    val totalSteps: Int      = 0,
-    val sessionStartMs: Long = System.currentTimeMillis(),
-    val avgStepDurationMs: Long = 0L,   // Round 11: running avg of full observe→act latency
+    val tasksCompleted: Int      = 0,
+    val tasksErrored: Int        = 0,
+    val totalSteps: Int          = 0,
+    val sessionStartMs: Long     = System.currentTimeMillis(),
+    val avgStepDurationMs: Long  = 0L,  // Round 11: running avg of full observe→act latency
+    val inferenceTimeoutCount: Int = 0, // Round 12: cumulative LLM inference timeouts this session
 ) {
     val successRate: Float
         get() = if (tasksCompleted + tasksErrored == 0) 0f
@@ -744,6 +745,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                     "action_performed"        -> handleActionPerformed(data)
                     "token_generated"         -> handleTokenGenerated(data)
                     "step_started"            -> handleStepStarted(data)
+                    "inference_timeout"       -> handleInferenceTimeout(data)
                     "thermal_status_changed"  -> handleThermalChanged(data)
                     "learning_cycle_complete"      -> handleLearningComplete(data)
                     "scheduler_training_started"  -> _schedulerActive.value = true
@@ -856,6 +858,23 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 prev.copy(avgStepDurationMs = updated)
             }
         }
+    }
+
+    /** Round 12: count each LLM inference timeout; abort after MAX_CONSECUTIVE_TIMEOUTS. */
+    private fun handleInferenceTimeout(data: Map<String, Any>) {
+        _sessionStats.update { it.copy(inferenceTimeoutCount = it.inferenceTimeoutCount + 1) }
+    }
+
+    /**
+     * Round 12: reset per-session UI state without stopping the agent.
+     * Clears the action log, session stats, token stream, and current step indicator.
+     * Useful after a long session to reclaim Compose list memory.
+     */
+    fun resetSession() {
+        _actionLogs.value   = emptyList()
+        _sessionStats.value = SessionStatsUiState(sessionStartMs = System.currentTimeMillis())
+        _streamBuffer.value = ""
+        _stepState.value    = StepUiState()
     }
 
     private fun handleTokenGenerated(data: Map<String, Any>) {
