@@ -638,10 +638,16 @@ What single UI action caused screen A → screen B?
     /**
      * Word-level Jaccard diff heuristic. Used when LLM is not loaded AND no annotation.
      *
-     *   Both new AND lost words large → full screen transition → tap
-     *   More new words than lost      → content appeared → tap
-     *   More lost words than new      → content removed → back
-     *   Similar count, different words → scroll
+     * Improvements over the original:
+     *   - Extracts the most significant changed word to use as a node hint (words ≥ 3 chars,
+     *     non-numeric, sorted by length DESC so meaningful labels beat short noise words).
+     *   - TYPE detection: if all new words look like a typed string (short, alphanumeric,
+     *     single token) and the overall change ratio is low → emit Type action.
+     *   - FULL-SCREEN TRANSITION: large symmetric change → Click on best-candidate label.
+     *   - BACK: content shrinkage without new words → Back navigation.
+     *   - SCROLL: minor symmetric word churn (menu items, list scroll).
+     *
+     * Heuristic only — coordinate binding still requires Accessibility tree (Phase 5.2+).
      */
     private fun inferActionHeuristic(prevOcr: String, nextOcr: String, frameIdx: Int): String {
         val prevWords = prevOcr.split(Regex("\\s+")).filter { it.isNotEmpty() }.toSet()
@@ -649,15 +655,33 @@ What single UI action caused screen A → screen B?
         val newWords  = nextWords - prevWords
         val lostWords = prevWords - nextWords
 
+        // Best-candidate label: longest meaningful word in lost (what was tapped) or new (what appeared)
+        val candidateWords = (lostWords + newWords)
+            .filter { it.length >= 3 && it.any { c -> c.isLetter() } }
+            .sortedByDescending { it.length }
+        val nodeHint  = candidateWords.firstOrNull()?.take(24)?.replace("\"", "") ?: "#1"
+        val reason    = buildString {
+            append("IRL heuristic frame $frameIdx")
+            if (nodeHint != "#1") append(": candidate='$nodeHint'")
+        }
+
+        // TYPE detection: single new short token (≤12 chars), only alphanumeric/punctuation
+        val looksTyped = newWords.size == 1 &&
+            newWords.first().length <= 12 &&
+            newWords.first().all { c -> c.isLetterOrDigit() || c in ".,!?@-_" }
+        if (looksTyped && lostWords.isEmpty()) {
+            return """{"tool":"Type","node_id":"#1","text":"${newWords.first()}","reason":"$reason: typed text appeared"}"""
+        }
+
         return when {
             newWords.size > 5 && lostWords.size > 5 ->
-                """{"tool":"Click","node_id":"#1","reason":"IRL heuristic frame $frameIdx: full screen transition"}"""
+                """{"tool":"Click","node_id":"$nodeHint","reason":"$reason: full screen transition"}"""
             newWords.size > lostWords.size ->
-                """{"tool":"Click","node_id":"#1","reason":"IRL heuristic frame $frameIdx: new content appeared"}"""
-            lostWords.size > newWords.size ->
-                """{"tool":"Back","reason":"IRL heuristic frame $frameIdx: content removed, likely back navigation"}"""
+                """{"tool":"Click","node_id":"$nodeHint","reason":"$reason: new content appeared"}"""
+            lostWords.size > newWords.size + 2 ->
+                """{"tool":"Back","reason":"$reason: content removed, likely back navigation"}"""
             else ->
-                """{"tool":"Swipe","direction":"up","reason":"IRL heuristic frame $frameIdx: minimal text change, likely scroll"}"""
+                """{"tool":"Swipe","direction":"up","reason":"$reason: minimal text change, likely scroll"}"""
         }
     }
 

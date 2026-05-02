@@ -1,0 +1,71 @@
+name: Android Kotlin Lint
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint:
+    name: Kotlin lint (no NDK)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-lint-${{ runner.os }}-${{ hashFiles('android/**/*.gradle', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-lint-${{ runner.os }}-
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      # Stub out the llama.cpp submodule so CMake/AGP does not abort.
+      # Lint does not compile native code — it only needs the Kotlin/Java sources.
+      - name: Create llama.cpp stub (prevents CMake missing-submodule error)
+        run: |
+          mkdir -p android/app/src/main/cpp/llama.cpp
+          echo "cmake_minimum_required(VERSION 3.18)" \
+            > android/app/src/main/cpp/llama.cpp/CMakeLists.txt
+          echo "project(llama_stub)" \
+            >> android/app/src/main/cpp/llama.cpp/CMakeLists.txt
+
+      - name: Run Android Lint
+        working-directory: android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g
+        run: |
+          ./gradlew lint \
+            --no-daemon \
+            --warning-mode all \
+            --console=plain \
+            -Pandroid.lint.abortOnError=false \
+            2>&1 | tee build/lint-output.log
+          echo "Lint exit code: $?"
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: |
+            android/app/build/reports/lint-results*.html
+            android/app/build/reports/lint-results*.xml
+            android/build/lint-output.log
+          retention-days: 14
+          if-no-files-found: ignore

@@ -144,6 +144,8 @@ data class ModuleUiState(
     val sam2DownloadedMb: Float       = 0f,
     val sam2DownloadPercent: Int      = 0,
     val sam2DownloadError: String?    = null,
+    // Stub mode — true when libllama-jni.so is not compiled (NDK build missing)
+    val isStubMode: Boolean           = true,
 )
 
 /** ExperienceStore breakdown for ActivityScreen. */
@@ -261,6 +263,8 @@ data class SafetyConfig(
     val blockedPackages: Set<String> = emptySet(),
     val allowlistMode: Boolean     = false,
     val allowedPackages: Set<String> = emptySet(),
+    /** User-defined additional sensitive package names (shown as a separate category in SafetyScreen). */
+    val customSensitivePackages: Set<String> = emptySet(),
 )
 
 /** One LoRA adapter checkpoint found on-disk. */
@@ -313,9 +317,24 @@ data class LoraTrainingProgress(
 )
 
 /**
- * Round 7: one recently-completed goal entry shown in GoalsScreen Templates tab
- * "Recently Completed" section so the user can instantly re-run a past task.
+ * Per-session performance counters shown in DashboardScreen.
+ * Reset when the ViewModel is created (i.e. on app launch).
  */
+data class SessionStatsUiState(
+    val tasksCompleted: Int  = 0,
+    val tasksErrored: Int    = 0,
+    val totalSteps: Int      = 0,
+    val sessionStartMs: Long = System.currentTimeMillis(),
+) {
+    val successRate: Float
+        get() = if (tasksCompleted + tasksErrored == 0) 0f
+                else tasksCompleted.toFloat() / (tasksCompleted + tasksErrored)
+    val avgStepsPerTask: Float
+        get() = if (tasksCompleted == 0) 0f else totalSteps.toFloat() / tasksCompleted
+    val sessionDurationMinutes: Long
+        get() = (System.currentTimeMillis() - sessionStartMs) / 60_000L
+}
+
 data class RecentGoalItem(
     val goal: String,
     val appPackage: String,
@@ -619,6 +638,12 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _recentGoals = MutableStateFlow<List<RecentGoalItem>>(emptyList())
     val recentGoals: StateFlow<List<RecentGoalItem>> = _recentGoals.asStateFlow()
 
+    // ── Round 8: session-level performance stats ──────────────────────────────
+    // Counts tasks completed/errored and total steps taken since app launch.
+    // DashboardScreen shows these in a collapsible "Session Stats" card.
+    private val _sessionStats = MutableStateFlow(SessionStatsUiState(sessionStartMs = System.currentTimeMillis()))
+    val sessionStats: StateFlow<SessionStatsUiState> = _sessionStats.asStateFlow()
+
     // ── LoRA training history + live progress ─────────────────────────────────
     private val _loraHistory = MutableStateFlow<List<LoraCheckpointItem>>(emptyList())
     val loraHistory: StateFlow<List<LoraCheckpointItem>> = _loraHistory.asStateFlow()
@@ -759,6 +784,18 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             _recentGoals.update { prev ->
                 (listOf(entry) + prev.filter { it.goal != entry.goal }).take(6)
             }
+        }
+        // Round 8: session stats — count completed/errored tasks and accumulate steps
+        if ((status == "idle" || status == "done") && prevState.status == "running") {
+            _sessionStats.update { it.copy(
+                tasksCompleted = it.tasksCompleted + 1,
+                totalSteps     = it.totalSteps + prevState.stepCount,
+            )}
+        } else if (status == "error" && prevState.status == "running") {
+            _sessionStats.update { it.copy(
+                tasksErrored = it.tasksErrored + 1,
+                totalSteps   = it.totalSteps + prevState.stepCount,
+            )}
         }
     }
 
@@ -909,6 +946,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 sam2Ready            = com.ariaagent.mobile.core.ai.Sam2Engine.isModelReady(context),
                 sam2Loaded           = com.ariaagent.mobile.core.ai.Sam2Engine.isLoaded(),
                 sam2DownloadedMb     = com.ariaagent.mobile.core.ai.Sam2Engine.downloadedBytes(context).toFloat() / 1_048_576f,
+                isStubMode           = com.ariaagent.mobile.core.ai.LlamaEngine.isStubMode,
             )}
             _agentState.update { it.copy(
                 modelReady          = ModelManager.isModelReady(context),
@@ -2577,6 +2615,13 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeAllowedPackage(pkg: String) =
         persistSafety(_safetyConfig.value.copy(allowedPackages = _safetyConfig.value.allowedPackages - pkg))
+
+    fun addCustomSensitivePackage(pkg: String) {
+        if (pkg.isBlank()) return
+        persistSafety(_safetyConfig.value.copy(customSensitivePackages = _safetyConfig.value.customSensitivePackages + pkg.trim()))
+    }
+    fun removeCustomSensitivePackage(pkg: String) =
+        persistSafety(_safetyConfig.value.copy(customSensitivePackages = _safetyConfig.value.customSensitivePackages - pkg))
 
     // ─── Triggers ─────────────────────────────────────────────────────────────
 

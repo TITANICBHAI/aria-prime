@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
+import com.ariaagent.mobile.ui.viewmodel.SessionStatsUiState
 import com.ariaagent.mobile.ui.viewmodel.SuggestionBannerItem
 import com.ariaagent.mobile.ui.theme.ARIAColors
 
@@ -52,6 +53,7 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
     val gameLoopState      by vm.gameLoopState.collectAsStateWithLifecycle()
     val pendingSuggestions by vm.pendingSuggestions.collectAsStateWithLifecycle()
     val hwStats            by vm.hardwareStats.collectAsStateWithLifecycle()
+    val sessionStats       by vm.sessionStats.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.refreshPendingSuggestions() }
 
@@ -311,6 +313,11 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
             }
         }
 
+        // ── Session stats ─────────────────────────────────────────────────────
+        if (sessionStats.tasksCompleted + sessionStats.tasksErrored > 0) {
+            SessionStatsCard(sessionStats)
+        }
+
         // ── Learning stats ────────────────────────────────────────────────────
         ARIACard {
             Text("ON-DEVICE LEARNING", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted))
@@ -334,6 +341,44 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                 )
             }
         }
+    }
+}
+
+// ─── Session Stats card ───────────────────────────────────────────────────────
+
+@Composable
+private fun SessionStatsCard(stats: SessionStatsUiState) {
+    ARIACard {
+        Text(
+            "SESSION STATS",
+            style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            SessionStat("Done",    "${stats.tasksCompleted}")
+            SessionStat("Errors",  "${stats.tasksErrored}")
+            SessionStat("Steps",   "${stats.totalSteps}")
+            SessionStat("Success", "${(stats.successRate * 100).toInt()}%")
+        }
+        if (stats.tasksCompleted > 0) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Avg ${String.format("%.1f", stats.avgStepsPerTask)} steps/task  •  " +
+                "Session ${stats.sessionDurationMinutes} min",
+                style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value, style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+        Text(label, style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp))
     }
 }
 

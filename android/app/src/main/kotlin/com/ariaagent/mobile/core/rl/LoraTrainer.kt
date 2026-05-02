@@ -72,6 +72,8 @@ object LoraTrainer {
         val adapterPath: String,
         val loraVersion: Int,
         val usedJni: Boolean = false,
+        /** True when training fell through to stubTrainLora() — no real weights updated. */
+        val isStubMode: Boolean = false,
         val errorMessage: String = ""
     )
 
@@ -167,7 +169,8 @@ object LoraTrainer {
                 labelSamplesUsed = labels.size,
                 adapterPath      = adapterPath,
                 loraVersion      = nextVersion,
-                usedJni          = jniSucceeded
+                usedJni          = jniSucceeded,
+                isStubMode       = !jniSucceeded
             )
         } catch (e: Exception) {
             Log.e(TAG, "[$mId] LoRA training failed: ${e.message}")

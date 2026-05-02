@@ -56,6 +56,9 @@ object LlamaEngine {
 
     private var jniAvailable = false
 
+    /** True when libllama-jni.so is NOT compiled — all inference returns stub responses. */
+    val isStubMode: Boolean get() = !jniAvailable
+
     fun isLoaded(): Boolean = modelHandle != 0L
 
     /**
@@ -128,8 +131,8 @@ object LlamaEngine {
             lastToksPerSec = nativeGetToksPerSec()
             result
         } else {
-            // Stub response for architecture testing without llama.cpp compiled
-            val stub = """{"tool":"Click","node_id":"#1","reason":"stub inference — llama.cpp not compiled"}"""
+            // Stub response — varies by prompt keywords so different subsystems get plausible actions
+            val stub = buildStubResponse(prompt)
             lastToksPerSec = 11.5
             onToken?.invoke(stub)
             stub
@@ -485,5 +488,32 @@ object LlamaEngine {
      */
     internal fun markJniAvailable() {
         jniAvailable = true
+    }
+
+    /**
+     * Builds a plausible stub JSON action by scanning for keywords in the prompt.
+     * Used when libllama-jni.so is not compiled so different agent subsystems
+     * receive a contextually relevant placeholder instead of always "Click #1".
+     */
+    private fun buildStubResponse(prompt: String): String {
+        val p = prompt.lowercase()
+        return when {
+            p.contains("type") || p.contains("input") || p.contains("keyboard") || p.contains("enter text") ->
+                """{"tool":"Type","node_id":"#1","text":"","reason":"stub inference — llama.cpp not compiled (type hint)"}"""
+            p.contains("scroll") ->
+                """{"tool":"Swipe","direction":"up","reason":"stub inference — llama.cpp not compiled (scroll hint)"}"""
+            p.contains("swipe") && p.contains("down") ->
+                """{"tool":"Swipe","direction":"down","reason":"stub inference — llama.cpp not compiled (swipe-down hint)"}"""
+            p.contains("swipe") ->
+                """{"tool":"Swipe","direction":"up","reason":"stub inference — llama.cpp not compiled (swipe hint)"}"""
+            p.contains("back") || p.contains("navigate back") || p.contains("go back") ->
+                """{"tool":"Back","reason":"stub inference — llama.cpp not compiled (back hint)"}"""
+            p.contains("wait") || p.contains("loading") || p.contains("spinner") ->
+                """{"tool":"Wait","durationMs":1500,"reason":"stub inference — llama.cpp not compiled (wait hint)"}"""
+            p.contains("long press") || p.contains("longpress") || p.contains("hold") ->
+                """{"tool":"LongPress","node_id":"#1","reason":"stub inference — llama.cpp not compiled (long-press hint)"}"""
+            else ->
+                """{"tool":"Click","node_id":"#1","reason":"stub inference — llama.cpp not compiled"}"""
+        }
     }
 }

@@ -111,6 +111,47 @@ fun ModulesScreen(
             }
         }
 
+        // ── Stub mode warning ─────────────────────────────────────────────────
+        if (modules.isStubMode) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(10.dp),
+                colors   = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFB45309).copy(alpha = 0.13f)),
+                elevation = CardDefaults.cardElevation(0.dp),
+                border   = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFB45309).copy(alpha = 0.45f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color(0xFFB45309),
+                        modifier = Modifier.size(20.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "STUB MODE — NDK NOT COMPILED",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = androidx.compose.ui.graphics.Color(0xFFB45309),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        )
+                        Text(
+                            "libllama-jni.so is missing. All AI inference returns placeholder responses. " +
+                            "Run ./gradlew assembleDebug with NDK r26+ to enable real inference.",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = ARIAColors.OnSurface,
+                                lineHeight = 17.sp,
+                                fontSize = 11.sp
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
         // ── MODEL CATALOG ─────────────────────────────────────────────────────
         ARIACard {
             Row(

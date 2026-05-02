@@ -1,5 +1,5 @@
 # ARIA Project — Comprehensive Gap Audit
-> Last updated: May 02, 2026  
+> Last updated: May 02, 2026 (Round 8)  
 > Status key: `[ ]` Open · `[~]` In Progress · `[x]` Done  
 > Sections: [1 Stub Files](#1-stub-files) · [2 Fake Core Features](#2-fake-core-features-stubs-masquerading-as-real-logic) · [3 ViewModel Data Disconnects](#3-viewmodel--data-layer-disconnects) · [4 Agent Loop Failure Modes](#4-agent-loop-failure-modes) · [5 UI Screen Holes](#5-ui-screens-with-known-holes) · [6 System-Level Gaps](#6-system-level-gaps) · [7 Connection Gaps](#7-connection-gaps-things-that-should-talk-but-dont) · [8 Dashboard Not Wired](#8-web-dashboard-not-connected-to-its-own-backend) · [9 Reality Check Admissions](#9-aria_reality_checkmd--confirmed-but-untracked-gaps) · [10 Migration Debt](#10-legacy--migration-debt) · [11 Manifest & Build](#11-manifest--build-gaps) · [12 Missing Infrastructure](#12-missing-infrastructure) · [Priority](#priority-order-recommended)
 
@@ -149,7 +149,7 @@ The project's own honesty doc admits these. They are tracked here so they don't 
 
 | | Gap | Where Admitted |
 |--|-----|---------------|
-| `[ ]` | LLM inference only works if NDK build + 870 MB model download are both complete. Default behavior is stub mode. | `ARIA_REALITY_CHECK.md` |
+| `[~]` | LLM inference only works if NDK build + 870 MB model download are both complete. Default behavior is stub mode. **Round 8:** `LlamaEngine.isStubMode` property added; `ModuleUiState.isStubMode` wired from it; `ModulesScreen` shows a persistent amber warning banner whenever `isStubMode=true`; stub `runInference()` now returns keyword-aware JSON (Type/Swipe/Back/Wait/LongPress/Click) instead of a hardcoded Click. | `ARIA_REALITY_CHECK.md` |
 | `[ ]` | Accessibility Service + MediaProjection require **manual user permission steps** before anything works. High friction, no in-app guidance. | `ARIA_REALITY_CHECK.md` |
 | `[ ]` | "8–15 tok/s" and "1700 MB RSS" are **hardcoded estimates** in the C++ code, not live measurements from this build. | `ARIA_REALITY_CHECK.md` |
 | `[ ]` | Policy Network starts with **random weights**. First N agent episodes are essentially random. | `ARIA_REALITY_CHECK.md` |
@@ -186,7 +186,7 @@ The project's own honesty doc admits these. They are tracked here so they don't 
 
 | | Item | Why It Matters |
 |--|------|---------------|
-| `[ ]` | No CI / automated build pipeline | Stub code can ship undetected. NDK is never compiled. Phase gates are never enforced. |
+| `[~]` | No CI / automated build pipeline | **Round 8:** `.github/workflows/lint.yml` added — runs `./gradlew lint` on every push/PR (Ubuntu, JDK 17, no NDK required; stubs the `llama.cpp` submodule so CMake doesn't abort). NDK compile step still missing. |
 | `[ ]` | No unit or integration tests | `OcrEngine.kt` mentions a "ML Kit stub for unit tests" but no test files exist. No way to catch regressions. |
 | `[ ]` | No crash / error reporting | Agent runs as a foreground service. Silent failures (stub returns, empty `onUpgrade`, swallowed error codes, empty `onCancelled`) have zero observability in production. |
 | `[ ]` | No device IP discovery for dashboard | `LocalDeviceServer` runs on the phone, but the web dashboard has no mechanism to find out what IP address or port to connect to. Needs a config screen or mDNS discovery. |
@@ -219,4 +219,8 @@ Items are ranked by impact and safety risk.
 | 17 | **Add Web Dashboard entry point in SettingsScreen** | `[x]` **Done** | `SettingsScreen.kt` "Web Dashboard" section (lines 436–503) shows a start/stop toggle and copies the server URL to clipboard when running. |
 | 18 | **Build Triggers feature in GoalsScreen** | `[x]` **Done** | `TriggerEvaluator` backend added in `core/triggers/`; `app_focus_changed` wired in `AgentAccessibilityService`; `trigger_fired` handler wired in `AgentForegroundService`. All five trigger types (TIME_ONCE/DAILY/WEEKLY, APP_LAUNCH, CHARGING) now fire end-to-end. |
 | 19 | **Phase 8 cleanup** — delete `MainActivity`, `ExpoModulesPackageList`, `artifacts/mobile/` | `[ ]` | Remove dead weight once verification gates pass. |
-| 20 | **Add CI, NDK build step, and test gates** | `[ ]` | Prevent gaps from reopening silently. |
+| 20 | **Add CI, NDK build step, and test gates** | `[~]` | **Round 8:** Kotlin lint CI added (`.github/workflows/lint.yml`). NDK build step and test gates still open. |
+| 21 | **Session stats surface on Dashboard** | `[x]` **Done** | `SessionStatsUiState` data class + `_sessionStats` StateFlow added to AgentViewModel. `handleStatusChanged` increments `tasksCompleted`/`tasksErrored` and accumulates `totalSteps` on running→idle/done/error transitions. `DashboardScreen` shows a `SessionStatsCard` (Done / Errors / Steps / Success% + avg steps/task + session duration) visible after the first task completes. |
+| 22 | **`SafetyConfig` user-defined sensitive apps** | `[x]` **Done** | `SafetyConfig.customSensitivePackages: Set<String>` added. `addCustomSensitivePackage`/`removeCustomSensitivePackage` VM functions added (mirror blocklist pattern). `SafetyScreen` gains a §6 "User-Added Sensitive Apps" card with add/remove/block/unblock per-package controls. |
+| 23 | **`LoraTrainer.TrainingResult.isStubMode`** | `[x]` **Done** | Field added; return site sets `isStubMode = !jniSucceeded` so callers know whether real weights were updated. |
+| 24 | **`IrlModule.inferActionHeuristic` improved** | `[x]` **Done** | Candidate-word extraction (longest meaningful changed word used as `node_id` hint); TYPE detection (single short alphanumeric new token + no lost words → Type action); asymmetric Back threshold loosened (`lostWords > newWords + 2`). Eliminates "Click #1" as the answer for every scenario. |

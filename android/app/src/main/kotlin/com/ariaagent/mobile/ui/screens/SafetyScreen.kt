@@ -197,6 +197,24 @@ fun SafetyScreen(
                 }
             }
         }
+
+        // ── 6. User-Added Sensitive Apps ──────────────────────────────────────
+        item {
+            Spacer(Modifier.height(16.dp))
+            SafetySectionLabel("User-Added Sensitive Apps", Icons.Default.PersonAdd, ARIAColors.Warning)
+            Spacer(Modifier.height(8.dp))
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                CustomSensitiveSection(
+                    packages  = safetyConfig.customSensitivePackages,
+                    blockedPackages = safetyConfig.blockedPackages,
+                    onAdd     = { vm.addCustomSensitivePackage(it) },
+                    onRemove  = { vm.removeCustomSensitivePackage(it) },
+                    onBlock   = { vm.addBlockedPackage(it) },
+                    onUnblock = { vm.removeBlockedPackage(it) },
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
@@ -459,6 +477,105 @@ private fun SensitiveCategoryRow(
             tint = if (allBlocked) ARIAColors.Destructive else ARIAColors.Muted,
             modifier = Modifier.size(18.dp)
         )
+    }
+}
+
+// ─── Custom Sensitive Apps Section ───────────────────────────────────────────
+
+@Composable
+private fun CustomSensitiveSection(
+    packages: Set<String>,
+    blockedPackages: Set<String>,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onBlock: (String) -> Unit,
+    onUnblock: (String) -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    var input by remember { mutableStateOf("") }
+
+    SafetyCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Add package names of apps you consider sensitive. You can then block them individually.",
+                style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value         = input,
+                    onValueChange = { input = it },
+                    modifier      = Modifier.weight(1f),
+                    placeholder   = { Text("com.example.myapp", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)) },
+                    singleLine    = true,
+                    shape         = RoundedCornerShape(8.dp),
+                    colors        = safetyFieldColors(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (input.isNotBlank()) { onAdd(input.trim()); input = "" }
+                        focusManager.clearFocus()
+                    })
+                )
+                IconButton(
+                    onClick  = { if (input.isNotBlank()) { onAdd(input.trim()); input = "" } },
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ARIAColors.Warning.copy(alpha = 0.15f))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = ARIAColors.Warning)
+                }
+            }
+            if (packages.isEmpty()) {
+                Text(
+                    "No user-defined sensitive apps yet.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                )
+            } else {
+                packages.sorted().forEach { pkg ->
+                    val isBlocked = pkg in blockedPackages
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ARIAColors.Warning.copy(alpha = 0.08f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = ARIAColors.Warning, modifier = Modifier.size(14.dp))
+                        Text(
+                            pkg,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = ARIAColors.OnSurface,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        // Block / unblock toggle
+                        IconButton(
+                            onClick = { if (isBlocked) onUnblock(pkg) else onBlock(pkg) },
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Icon(
+                                if (isBlocked) Icons.Default.LockOpen else Icons.Default.Block,
+                                contentDescription = if (isBlocked) "Unblock" else "Block",
+                                tint = if (isBlocked) ARIAColors.Success else ARIAColors.Destructive,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        // Remove from sensitive list
+                        IconButton(onClick = { onRemove(pkg) }, modifier = Modifier.size(26.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove", tint = ARIAColors.Muted, modifier = Modifier.size(13.dp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
