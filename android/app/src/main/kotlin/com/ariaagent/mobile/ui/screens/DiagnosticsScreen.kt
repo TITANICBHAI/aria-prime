@@ -4,6 +4,7 @@ package com.ariaagent.mobile.ui.screens
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -474,6 +475,26 @@ fun DiagnosticsScreen(
                                     relativeTime(file.lastModified()),
                                     style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
                                 )
+                            }
+                            // Round 16 §103: share individual crash report via system share sheet.
+                            val diagCtx = LocalContext.current
+                            IconButton(
+                                onClick  = {
+                                    val text = runCatching { file.readText() }.getOrDefault("(unreadable)")
+                                    diagCtx.startActivity(
+                                        Intent.createChooser(
+                                            Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_TEXT, text)
+                                                putExtra(Intent.EXTRA_SUBJECT, "ARIA Crash: ${file.name}")
+                                            },
+                                            "Share Crash Report"
+                                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                    )
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Share, "Share crash", tint = ARIAColors.Muted, modifier = Modifier.size(14.dp))
                             }
                             TextButton(
                                 onClick = { expandedCrashFile = if (isExpanded) null else file.name },

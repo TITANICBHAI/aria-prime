@@ -556,6 +556,18 @@ private fun TemplatesTab(
             )
         }
 
+        // Round 16 §104: result count badge shown when search is active.
+        if (searchQuery.isNotBlank()) {
+            Text(
+                "${filteredTemplates.size} of ${GOAL_TEMPLATES.size} templates",
+                style    = MaterialTheme.typography.labelSmall.copy(
+                    color = if (filteredTemplates.isEmpty()) ARIAColors.Destructive else ARIAColors.Muted,
+                    fontSize = 10.sp,
+                ),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+            )
+        }
+
         LazyVerticalGrid(
             columns         = GridCells.Fixed(2),
             modifier        = Modifier.fillMaxSize(),

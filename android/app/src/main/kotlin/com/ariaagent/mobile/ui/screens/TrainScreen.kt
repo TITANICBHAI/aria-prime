@@ -289,10 +289,18 @@ private fun RlStatusCard(
         }
 
         if (status != null && status.adamStep > 0) {
+            val estimatedSamples = status.adamStep.toLong() * 32L
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Adam step: ${status.adamStep}", color = ARIAColors.TextMuted, fontSize = 11.sp)
                 Text("Policy loss: %.4f".format(status.lastPolicyLoss), color = ARIAColors.TextMuted, fontSize = 11.sp)
             }
+            // Round 16 §94: estimated samples processed (adamStep × default batch size 32).
+            Text(
+                "Est. samples processed: ${if (estimatedSamples >= 1_000L) "${estimatedSamples / 1_000L}K" else "$estimatedSamples"}",
+                color      = ARIAColors.Accent,
+                fontSize   = 10.sp,
+                fontFamily = FontFamily.Monospace,
+            )
         }
 
         if (status != null && status.lastTrainedAt > 0L) {

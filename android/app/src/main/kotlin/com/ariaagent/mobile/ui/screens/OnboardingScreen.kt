@@ -127,8 +127,16 @@ fun OnboardingScreen(
                     )
                 }
             }
+            // Round 16 §93: numeric step counter beneath the dot indicators.
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Step ${currentStep + 1} of ${ONBOARDING_STEPS.size}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = ARIAColors.Muted, fontSize = 10.sp
+                )
+            )
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(42.dp))
 
             // ── Animated step content ─────────────────────────────────────────
             AnimatedContent(

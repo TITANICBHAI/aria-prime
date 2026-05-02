@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -440,6 +441,23 @@ fun ControlScreen(
                 maxLines = 3,
                 enabled = isIdle
             )
+            // Round 16 §100: character count indicator — turns amber at 160, red at 200.
+            if (goalText.isNotBlank()) {
+                Text(
+                    "${goalText.length} / 200",
+                    style    = MaterialTheme.typography.labelSmall.copy(
+                        color      = when {
+                            goalText.length >= 200 -> ARIAColors.Destructive
+                            goalText.length >= 160 -> ARIAColors.Warning
+                            else                   -> ARIAColors.Muted
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize   = 9.sp,
+                    ),
+                    modifier  = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End,
+                )
+            }
             // Round 14 §73: recently-completed goals as one-tap chips.
             if (recentGoals.isNotEmpty() && isIdle) {
                 Spacer(Modifier.height(8.dp))

@@ -514,6 +514,11 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _uptimeSeconds = MutableStateFlow(0L)
     val uptimeSeconds: StateFlow<Long> = _uptimeSeconds.asStateFlow()
 
+    // Round 16 §102: wall-clock duration of the most recently completed task.
+    private var taskRunStartMs = 0L
+    private val _lastTaskDurationMs = MutableStateFlow(0L)
+    val lastTaskDurationMs: StateFlow<Long> = _lastTaskDurationMs.asStateFlow()
+
     // ── Migration Phase 5: Chat ───────────────────────────────────────────────
 
     private val welcomeChatMsg = ChatMessageItem(
@@ -838,6 +843,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         // Round 14 §75: start / stop uptime timer as the agent transitions in/out of "running".
         if (status == "running" && prevState.status != "running") {
             _uptimeSeconds.value = 0L
+            taskRunStartMs = System.currentTimeMillis()  // Round 16 §102: record task wall-clock start.
             uptimeJob?.cancel()
             uptimeJob = viewModelScope.launch {
                 while (true) {
@@ -866,6 +872,8 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Round 8: session stats — count completed/errored tasks and accumulate steps
         if ((status == "idle" || status == "done") && prevState.status == "running") {
+            // Round 16 §102: capture duration before session stats update.
+            if (taskRunStartMs > 0L) _lastTaskDurationMs.value = System.currentTimeMillis() - taskRunStartMs
             _sessionStats.update { it.copy(
                 tasksCompleted = it.tasksCompleted + 1,
                 totalSteps     = it.totalSteps + prevState.stepCount,
@@ -876,6 +884,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 body  = prevState.currentTask.take(80).ifBlank { "Task finished" }
             )
         } else if (status == "error" && prevState.status == "running") {
+            if (taskRunStartMs > 0L) _lastTaskDurationMs.value = System.currentTimeMillis() - taskRunStartMs
             _sessionStats.update { it.copy(
                 tasksErrored = it.tasksErrored + 1,
                 totalSteps   = it.totalSteps + prevState.stepCount,

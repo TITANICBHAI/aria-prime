@@ -696,6 +696,18 @@ private fun LabelerToolbar(
             )
         }
     }
+    // Round 16 §96: indeterminate progress bar visible while the LLM enriches labels.
+    if (enriching) {
+        LinearProgressIndicator(
+            modifier   = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 3.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color      = ARIAColors.Accent,
+            trackColor = ARIAColors.Accent.copy(alpha = 0.15f),
+        )
+    }
 }
 
 // ─── Shared field colors ──────────────────────────────────────────────────────

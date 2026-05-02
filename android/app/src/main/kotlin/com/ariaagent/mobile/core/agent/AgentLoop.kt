@@ -324,6 +324,17 @@ object AgentLoop {
                         AgentEventBus.emit("step_started", stepData)
                     }
 
+                    // ── Round 16 §97: screen-power guard ─────────────────────
+                    // If the display is off (interactive = false) skip this step
+                    // and retry in 3 s. Prevents wasted inference + battery drain
+                    // when the user locks the device mid-task.
+                    val pm97 = context.getSystemService(android.os.PowerManager::class.java)
+                    if (pm97 != null && !pm97.isInteractive) {
+                        Log.d("AgentLoop", "Screen off — waiting 3s before next step")
+                        delay(3_000L)
+                        continue
+                    }
+
                     // ── 0b. ACCESSIBILITY SERVICE GUARD ──────────────────────
                     // On low-RAM devices (M31: 6 GB) the OS can temporarily suspend the
                     // Accessibility Service. A single null frame must not abort the task —

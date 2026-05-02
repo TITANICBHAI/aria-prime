@@ -54,7 +54,8 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
     val gameLoopState      by vm.gameLoopState.collectAsStateWithLifecycle()
     val pendingSuggestions by vm.pendingSuggestions.collectAsStateWithLifecycle()
     val hwStats            by vm.hardwareStats.collectAsStateWithLifecycle()
-    val sessionStats       by vm.sessionStats.collectAsStateWithLifecycle()
+    val sessionStats           by vm.sessionStats.collectAsStateWithLifecycle()
+    val lastTaskDurationMs     by vm.lastTaskDurationMs.collectAsStateWithLifecycle()
     val networkType        by vm.networkType.collectAsStateWithLifecycle()
     val uptimeSeconds      by vm.uptimeSeconds.collectAsStateWithLifecycle()
 
@@ -400,7 +401,7 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
 
         // ── Session stats ─────────────────────────────────────────────────────
         if (sessionStats.tasksCompleted + sessionStats.tasksErrored > 0) {
-            SessionStatsCard(sessionStats)
+            SessionStatsCard(sessionStats, lastTaskDurationMs)
         }
 
         // ── Learning stats ────────────────────────────────────────────────────
@@ -432,7 +433,8 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
 // ─── Session Stats card ───────────────────────────────────────────────────────
 
 @Composable
-private fun SessionStatsCard(stats: SessionStatsUiState) {
+private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Long = 0L) {
+    val lastDurSec = (lastTaskDurationMs / 1_000L).toInt()
     ARIACard {
         Text(
             "SESSION STATS",
@@ -447,6 +449,12 @@ private fun SessionStatsCard(stats: SessionStatsUiState) {
             SessionStat("Errors",  "${stats.tasksErrored}")
             SessionStat("Steps",   "${stats.totalSteps}")
             SessionStat("Success", "${(stats.successRate * 100).toInt()}%")
+            // Round 16 §98: last task wall-clock duration chip.
+            if (lastDurSec > 0) {
+                val durStr = if (lastDurSec >= 60) "${lastDurSec / 60}m ${lastDurSec % 60}s"
+                             else "${lastDurSec}s"
+                SessionStat("Last Task", durStr)
+            }
         }
         if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {
             Spacer(Modifier.height(6.dp))

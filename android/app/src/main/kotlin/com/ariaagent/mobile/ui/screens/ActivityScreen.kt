@@ -531,11 +531,39 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
             if (entries.isEmpty()) 0
             else ((entries.sumOf { it.reward.coerceIn(0.0, 1.0) } / entries.size) * 100).toInt()
         }
+        // Round 16 §99: edge-case filter chip.
+        var showEdgeCasesOnly by remember { mutableStateOf(false) }
+        val edgeCaseCount = remember(entries) { entries.count { it.isEdgeCase } }
+        val displayEntries = remember(entries, showEdgeCasesOnly) {
+            if (showEdgeCasesOnly) entries.filter { it.isEdgeCase } else entries
+        }
         LazyColumn(
             modifier        = Modifier.fillMaxSize(),
             contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Round 16 §99: edge-cases filter chip row.
+            item {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                    FilterChip(
+                        selected = showEdgeCasesOnly,
+                        onClick  = { showEdgeCasesOnly = !showEdgeCasesOnly },
+                        label    = {
+                            Text(
+                                "Edge Cases ($edgeCaseCount)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                            )
+                        },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ARIAColors.Warning.copy(alpha = 0.18f),
+                            selectedLabelColor     = ARIAColors.Warning,
+                        ),
+                        leadingIcon = if (showEdgeCasesOnly) {{
+                            Icon(Icons.Default.FilterAlt, null, tint = ARIAColors.Warning, modifier = Modifier.size(14.dp))
+                        }} else null,
+                    )
+                }
+            }
             // ── Gap 8: Stats bar ──────────────────────────────────────────────
             if (stats.total > 0) {
                 item {
@@ -561,7 +589,7 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                     }
                 }
             }
-            items(entries, key = { it.id }) { entry ->
+            items(displayEntries, key = { it.id }) { entry ->
                 MemoryRow(entry = entry)
             }
         }

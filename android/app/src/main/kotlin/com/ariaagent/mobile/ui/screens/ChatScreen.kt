@@ -76,11 +76,14 @@ fun ChatScreen(vm: AgentViewModel) {
     val scope        = rememberCoroutineScope()
     val llmLoaded    = agentState.modelLoaded
 
-    val contextLine = remember(agentState, taskQueue, appSkills) {
+    val contextLine = remember(agentState, taskQueue, appSkills, messages.size) {
         val parts = mutableListOf<String>()
         if (agentState.status != "idle") parts += "agent: ${agentState.status}"
         if (taskQueue.isNotEmpty()) parts += "${taskQueue.size} queued"
         if (appSkills.isNotEmpty()) parts += "${appSkills.size} skills"
+        // Round 16 §101: include user message count in context line.
+        val userMsgCount = messages.count { it.role == "user" }
+        if (userMsgCount > 0) parts += "$userMsgCount msg${if (userMsgCount == 1) "" else "s"}"
         parts.joinToString(" · ").ifBlank { null }
     }
 

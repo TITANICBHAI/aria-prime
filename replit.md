@@ -161,3 +161,17 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-02 — **Round 16 — closed GAP_AUDIT §93–§104 (12 items):**
+  1. **`OnboardingScreen` step N-of-M counter (§93)** — `"Step N of M"` text added below dot indicators so users know their numeric position.
+  2. **`TrainScreen` estimated samples processed (§94)** — `adamStep × 32` displayed as `"Est. samples processed: NK"` accent-coloured monospace line in `RlStatusCard`.
+  3. **`SafetyScreen` preset N/M blocked badge (§95)** — `SensitiveCategoryRow` shows `"N/M"` count badge (warning=partial, red=all) replacing the text-only "PARTIAL" label.
+  4. **`LabelerScreen` enrichment progress bar (§96)** — 3 dp `LinearProgressIndicator` shown below toolbar when `enriching == true`.
+  5. **`AgentLoop` screen-power guard (§97)** — `PowerManager.isInteractive` checked after `step_started`; loop waits 3 s and skips inference when screen is off.
+  6. **`DashboardScreen` last-task duration chip (§98)** — `lastTaskDurationMs` StateFlow collected and displayed as `SessionStat("Last Task", "Xm Ys")` chip in `SessionStatsCard`.
+  7. **`ActivityScreen` edge-cases filter chip (§99)** — `FilterChip("Edge Cases (N)")` with amber selection added as first LazyColumn item; filters `displayEntries` to `isEdgeCase == true`.
+  8. **`ControlScreen` goal character count (§100)** — Right-aligned `"N / 200"` monospace counter below goal field; amber at 160, red at 200.
+  9. **`ChatScreen` message count in context line (§101)** — `userMsgCount` appended to `contextLine` parts (e.g. "3 msgs") when > 0.
+  10. **`AgentViewModel` `lastTaskDurationMs` StateFlow (§102)** — Records wall-clock start on `running` entry and computes duration on `idle/done/error` exit; exposed as `StateFlow<Long>`.
+  11. **`DiagnosticsScreen` crash file share button (§103)** — 28 dp share `IconButton` added per crash file row; launches `Intent.ACTION_SEND` with file content + filename as subject.
+  12. **`GoalsScreen` search results count badge (§104)** — `"N of M templates"` label above grid when search is active; red when zero results.
+  **Files changed:** `OnboardingScreen.kt`, `TrainScreen.kt`, `SafetyScreen.kt`, `LabelerScreen.kt`, `AgentLoop.kt`, `AgentViewModel.kt`, `DashboardScreen.kt`, `ActivityScreen.kt`, `ControlScreen.kt`, `ChatScreen.kt`, `DiagnosticsScreen.kt`, `GoalsScreen.kt`, `GAP_AUDIT.md`, `replit.md`.

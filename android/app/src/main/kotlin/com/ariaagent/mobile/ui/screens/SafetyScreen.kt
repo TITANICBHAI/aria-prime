@@ -508,9 +508,12 @@ private fun SensitiveCategoryRow(
             Text(label, style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.OnSurface, fontWeight = FontWeight.SemiBold))
             Text("${packages.size} apps", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
         }
-        if (someBlocked && !allBlocked) {
-            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ARIAColors.Warning.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text("PARTIAL", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Warning, fontWeight = FontWeight.Bold, fontSize = 9.sp))
+        // Round 16 §95: show N/M blocked count badge for any category with blocked apps.
+        val blockedCount = packages.count { it in blockedPackages }
+        if (blockedCount > 0) {
+            val badgeColor = if (allBlocked) ARIAColors.Destructive else ARIAColors.Warning
+            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(badgeColor.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                Text("$blockedCount/${packages.size}", style = MaterialTheme.typography.labelSmall.copy(color = badgeColor, fontWeight = FontWeight.Bold, fontSize = 9.sp))
             }
         }
         Icon(
