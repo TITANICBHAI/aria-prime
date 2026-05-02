@@ -23,17 +23,24 @@ import kotlinx.coroutines.flow.asSharedFlow
  *   can be called from any thread (Dispatchers.Default, Main, or IO).
  *
  * Event catalogue (name → payload keys):
- *   agent_status_changed    status, currentTask, currentApp, stepCount, lastAction, lastError, gameMode
- *   token_generated         token, tokensPerSecond
- *   action_performed        tool, nodeId, success, reward, stepCount
- *   step_started            stepNumber, activity ("observe"|"reason"|"act"|"store")
- *   learning_cycle_complete loraVersion, policyVersion
- *   thermal_status_changed  level, inferenceSafe, trainingSafe, emergency
- *   game_loop_status        isActive, gameType, episodeCount, stepCount, currentScore, highScore, totalReward, lastAction, isGameOver
- *   model_download_progress percent, downloadedMb, totalMb, speedMbps
- *   model_download_complete path
- *   model_download_error    error
- *   config_updated          (same keys as getConfig return)
+ *   agent_status_changed         status, currentTask, currentApp, stepCount, lastAction, lastError, gameMode
+ *   token_generated              token, tokensPerSecond
+ *   action_performed             tool, nodeId, success, reward, stepCount, appPackage, timestamp
+ *   step_started                 stepNumber, activity ("observe"|"reason"|"act"|"store")
+ *   learning_cycle_complete      loraVersion, policyVersion
+ *   thermal_status_changed       level, inferenceSafe, trainingSafe, emergency
+ *   game_loop_status             isActive, gameType, episodeCount, stepCount, currentScore, highScore, totalReward, lastAction, isGameOver
+ *   model_download_progress      percent, downloadedMb, totalMb, speedMbps
+ *   model_download_complete      path
+ *   model_download_error         error
+ *   config_updated               (same keys as getConfig return)
+ *   skill_updated                package, successRate, taskCount, elementCount
+ *   task_chain_advanced          goal, appPackage, queueSize
+ *   scheduler_training_started   (no payload)
+ *   scheduler_training_stopped   (no payload)
+ *   trigger_fired                triggerId, triggerType, goal, appPackage
+ *   app_focus_changed            package, previousPackage
+ *   orchestration.*              (wildcard) componentId, event, data — routed to DiagnosticsScreen ring buffer
  *
  * Phase: 10+ (Migration complete) — sole event channel for Compose ViewModel.
  */

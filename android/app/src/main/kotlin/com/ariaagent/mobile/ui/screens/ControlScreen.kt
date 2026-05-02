@@ -97,6 +97,7 @@ fun ControlScreen(
     val canStart   = isIdle && goalText.isNotBlank()
             && moduleState.modelLoaded
             && moduleState.accessibilityGranted
+    val queueAtCapacity = taskQueue.size >= 20  // TaskQueueManager.MAX_QUEUE_SIZE
 
     Column(
         modifier = Modifier
@@ -574,9 +575,10 @@ fun ControlScreen(
                     )
                     if (taskQueue.isNotEmpty()) {
                         Text(
-                            "(${taskQueue.size})",
+                            if (queueAtCapacity) "(${taskQueue.size}/20 — FULL)" else "(${taskQueue.size}/20)",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = ARIAColors.Accent, fontWeight = FontWeight.Bold
+                                color = if (queueAtCapacity) ARIAColors.Error else ARIAColors.Accent,
+                                fontWeight = FontWeight.Bold
                             )
                         )
                     }
@@ -660,14 +662,19 @@ fun ControlScreen(
                         queueApp  = ""
                     }
                 },
-                enabled = queueGoal.isNotBlank(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = ARIAColors.Accent),
+                enabled = queueGoal.isNotBlank() && !queueAtCapacity,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (queueAtCapacity) ARIAColors.Muted else ARIAColors.Accent
+                ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.AddCircleOutline, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Add to Queue", fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (queueAtCapacity) "Queue Full (max 20)" else "Add to Queue",
+                    fontWeight = FontWeight.SemiBold
+                )
             }
 
             if (taskQueue.isNotEmpty()) {

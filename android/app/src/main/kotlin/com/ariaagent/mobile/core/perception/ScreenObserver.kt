@@ -29,6 +29,13 @@ import com.ariaagent.mobile.system.screen.ScreenCaptureService
  */
 object ScreenObserver {
 
+    /**
+     * Matches standalone digit sequences (integers, comma-separated numbers, decimals).
+     * Used only by [ScreenSnapshot.screenHashFuzzy] for stuck-detection — never for DB keys.
+     * Examples matched: "42", "1,234", "3.14", "100,000" — NOT "720p", "MP4", "3G".
+     */
+    private val DYNAMIC_DIGITS_RE = Regex("""\b\d+(?:[,.]\d+)*\b""")
+
     data class ScreenSnapshot(
         val appPackage: String,
         val activityName: String,
@@ -84,6 +91,29 @@ object ScreenObserver {
                 bytes.take(8).joinToString("") { "%02x".format(it) }
             } catch (_: Exception) {
                 // Fallback to hashCode if MessageDigest is somehow unavailable
+                combined.hashCode().toString(16)
+            }
+        }
+
+        /**
+         * Fuzzy variant of [screenHash] for stuck-detection ONLY (never for database keying).
+         *
+         * Strips standalone digit sequences (counters, notification badges, "X min ago"
+         * time labels, score displays) before hashing so that minor dynamic updates do not
+         * reset the stuck counter unnecessarily — closing GAP_AUDIT §4 screen-hash-jitter.
+         *
+         * Database records (ObjectLabelStore, VisionEmbeddingStore, SessionReplayStore)
+         * always use [screenHash] so that existing indexed data is never invalidated.
+         */
+        fun screenHashFuzzy(): String {
+            val combined = "$appPackage|${activityName.substringAfterLast('.')}|" +
+                DYNAMIC_DIGITS_RE.replace(a11yTree.take(500), "#N") + "|" +
+                DYNAMIC_DIGITS_RE.replace(ocrText.take(200), "#N")
+            return try {
+                val digest = java.security.MessageDigest.getInstance("SHA-256")
+                val bytes  = digest.digest(combined.toByteArray(Charsets.UTF_8))
+                bytes.take(8).joinToString("") { "%02x".format(it) }
+            } catch (_: Exception) {
                 combined.hashCode().toString(16)
             }
         }

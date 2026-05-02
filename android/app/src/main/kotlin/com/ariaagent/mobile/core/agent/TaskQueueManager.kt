@@ -43,6 +43,14 @@ object TaskQueueManager {
     private const val TAG        = "TaskQueueManager"
     private const val QUEUE_FILE = "aria_task_queue.json"
 
+    /**
+     * Maximum number of tasks the queue will hold.
+     * Prevents unbounded task chaining when the user (or a script) keeps adding tasks
+     * after every completion — closes GAP_AUDIT §4 "task chaining no ceiling".
+     * [enqueue] returns `null` when this limit is already reached.
+     */
+    const val MAX_QUEUE_SIZE = 20
+
     // ─── Data model ───────────────────────────────────────────────────────────
 
     data class QueuedTask(
@@ -71,10 +79,17 @@ object TaskQueueManager {
 
     /**
      * Add a task to the queue. Tasks are sorted by priority (asc) then enqueuedAt (asc).
-     * Returns the newly created [QueuedTask].
+     *
+     * Returns the newly created [QueuedTask], or `null` if the queue is already at
+     * [MAX_QUEUE_SIZE] capacity. Callers should surface a rejection to the user.
      */
     @Synchronized
-    fun enqueue(context: Context, goal: String, appPackage: String, priority: Int = 0): QueuedTask {
+    fun enqueue(context: Context, goal: String, appPackage: String, priority: Int = 0): QueuedTask? {
+        val current = readQueue(context).toMutableList()
+        if (current.size >= MAX_QUEUE_SIZE) {
+            Log.w(TAG, "Queue full ($MAX_QUEUE_SIZE tasks) — rejecting: \"${goal.take(60)}\"")
+            return null
+        }
         val task = QueuedTask(
             id         = java.util.UUID.randomUUID().toString(),
             goal       = goal.trim(),
@@ -82,11 +97,10 @@ object TaskQueueManager {
             priority   = priority,
             enqueuedAt = System.currentTimeMillis(),
         )
-        val current = readQueue(context).toMutableList()
         current.add(task)
         current.sortWith(compareBy({ it.priority }, { it.enqueuedAt }))
         writeQueue(context, current)
-        Log.i(TAG, "Enqueued task ${task.id}: \"${task.goal}\" (priority=$priority, queueSize=${current.size})")
+        Log.i(TAG, "Enqueued task ${task.id}: \"${task.goal}\" (priority=$priority, queueSize=${current.size}/$MAX_QUEUE_SIZE)")
         return task
     }
 

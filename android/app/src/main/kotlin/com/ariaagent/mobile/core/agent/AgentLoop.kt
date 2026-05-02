@@ -182,10 +182,15 @@ object AgentLoop {
             // Thresholds: 3 → inject hint | 5 → force Back | 8 → abort task.
             // sameHashCount: debounce — require 2 identical consecutive hashes before
             // incrementing stuckCount, reducing false positives from animated content.
-            var stuckCount      = 0
-            var sameHashCount   = 0
-            var lastScreenHash  = ""
-            var stuckHint       = ""
+            // lastScreenHashFuzzy: fuzzy variant (digits stripped) for stuck comparisons
+            // only — prevents counter/timestamp changes from resetting stuckCount
+            // (GAP_AUDIT §4 screen-hash-jitter). lastScreenHash (exact) is used for
+            // DB keying and the stuckCount-reset guard at line ~706.
+            var stuckCount          = 0
+            var sameHashCount       = 0
+            var lastScreenHash      = ""
+            var lastScreenHashFuzzy = ""
+            var stuckHint           = ""
 
             // ── Dead A11y node tracking (GAP_AUDIT §4) ─────────────────────────
             // If GestureEngine fails on the same nodeId DEAD_NODE_THRESHOLD times
@@ -268,6 +273,7 @@ object AgentLoop {
                             stuckCount            = 0
                             stuckHint             = ""
                             lastScreenHash        = ""
+                            lastScreenHashFuzzy   = ""
                             delay(STEP_DELAY_MS)
                             continue
                         } else {
@@ -659,15 +665,16 @@ object AgentLoop {
                     // ── 4b. STUCK DETECTION (Phase 18) ────────────────────────
                     // Track whether the screen changed AND the agent isn't spinning.
                     // Definition of "stuck": same screen hash AND action is NOT Wait/Back/Done.
-                    val currentHash = snapshot.screenHash()
+                    val currentHash      = snapshot.screenHash()       // exact — DB keying
+                    val currentHashFuzzy = snapshot.screenHashFuzzy()  // digits stripped — stuck detection (GAP_AUDIT §4)
                     val isWaiting   = actionJson.contains("\"tool\":\"Wait\"", ignoreCase = true)
                     val isBacking   = actionJson.contains("\"tool\":\"Back\"", ignoreCase = true)
                     val isDoneNow   = actionJson.contains("\"tool\":\"Done\"", ignoreCase = true)
-                    // Debounced stuck detection: require the hash to be UNCHANGED for
-                    // 2 consecutive ticks before scoring it as a genuine stuck step.
-                    // This prevents animated content (hash jitter from looping spinners,
-                    // score counters, etc.) from falsely triggering the stuck escalation.
-                    if (!isDoneNow && !isWaiting && !isBacking && currentHash == lastScreenHash) {
+                    // Debounced stuck detection: require the FUZZY hash to be UNCHANGED for
+                    // 2 consecutive ticks before scoring a genuine stuck step. Using the
+                    // fuzzy hash (digits stripped) prevents counter increments, notification
+                    // badges, and "X min ago" timestamps from constantly resetting stuckCount.
+                    if (!isDoneNow && !isWaiting && !isBacking && currentHashFuzzy == lastScreenHashFuzzy) {
                         sameHashCount++
                         if (sameHashCount >= 2) {
                             sameHashCount = 0
@@ -708,7 +715,8 @@ object AgentLoop {
                             stuckHint  = ""
                         }
                     }
-                    lastScreenHash = currentHash
+                    lastScreenHash      = currentHash
+                    lastScreenHashFuzzy = currentHashFuzzy
 
                     // ── 5. ACT ────────────────────────────────────────────────
                     val isDone = actionJson.contains("\"tool\":\"Done\"")
@@ -729,6 +737,7 @@ object AgentLoop {
                             stuckCount            = 0
                             stuckHint             = ""
                             lastScreenHash        = ""
+                            lastScreenHashFuzzy   = ""
                             stepsInCurrentSubTask = 0   // fresh budget for each sub-task
                             Log.i("AgentLoop", "Sub-task done → step ${subTaskIdx + 1}/${subTasksRaw.size}: \"$currentSubGoal\"")
                             ProgressPersistence.logNote(context,

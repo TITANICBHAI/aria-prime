@@ -649,6 +649,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         refreshLoraHistory()
         refreshReplaySessions()
         refreshPendingSuggestions()
+        loadTriggers()
 
         // Auto-load vision model on startup if files are already on disk.
         // This pre-warms the ~200 MB model so the first agent step does not
@@ -1502,7 +1503,11 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     fun enqueueTask(goal: String, appPackage: String = "", priority: Int = 0) {
         viewModelScope.launch(Dispatchers.IO) {
-            TaskQueueManager.enqueue(context, goal, appPackage, priority)
+            val task = TaskQueueManager.enqueue(context, goal, appPackage, priority)
+            if (task == null) {
+                android.util.Log.w("AgentViewModel",
+                    "enqueueTask rejected — queue at capacity (${TaskQueueManager.MAX_QUEUE_SIZE} tasks)")
+            }
             refreshTaskQueue()
         }
     }
