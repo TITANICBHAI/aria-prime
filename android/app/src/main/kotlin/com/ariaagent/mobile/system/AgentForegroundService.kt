@@ -22,6 +22,7 @@ import com.ariaagent.mobile.core.orchestration.OrchestrationEvent
 import com.ariaagent.mobile.core.orchestration.PolicyNetworkComponent
 import com.ariaagent.mobile.core.orchestration.VisionEngineComponent
 import com.ariaagent.mobile.core.rl.LearningScheduler
+import com.ariaagent.mobile.core.triggers.TriggerEvaluator
 import com.ariaagent.mobile.core.system.ThermalGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +133,11 @@ class AgentForegroundService : Service() {
     // Started in onCreate(), stopped in onDestroy().
     private var learningScheduler: LearningScheduler? = null
 
+    // TriggerEvaluator: evaluates stored triggers (time/app/charging) and fires
+    // them by emitting "trigger_fired" onto AgentEventBus. Started/stopped with
+    // the service lifecycle so triggers work even when no agent task is running.
+    private var triggerEvaluator: TriggerEvaluator? = null
+
     // ── CentralOrchestrator (FLAWS.md #1) ─────────────────────────────────────
     // Component-level coordinator: registry, event router, diff engine, health
     // monitor, scheduler, and LLM-backed problem-solving broker. Constructed
@@ -173,6 +179,13 @@ class AgentForegroundService : Service() {
         // ── LearningScheduler: start battery-change listener for auto-RL during charging ─
         learningScheduler = LearningScheduler(this).also { it.start() }
         Log.i(TAG, "LearningScheduler started — auto-training active during charging")
+
+        // ── TriggerEvaluator: start automation trigger backend ─────────────────
+        // Evaluates all stored TriggerItems (time, app-launch, charging) and fires
+        // them by emitting "trigger_fired" onto AgentEventBus. The bus collector
+        // below handles that event and starts the agent loop.
+        triggerEvaluator = TriggerEvaluator(this).also { it.start() }
+        Log.i(TAG, "TriggerEvaluator started — scheduled automation triggers active")
 
         // ── CentralOrchestrator (FLAWS.md #1) ──────────────────────────────────
         // Construct the orchestrator with the on-device LLM as its problem-solver,
@@ -310,6 +323,29 @@ class AgentForegroundService : Service() {
                             }
                         }
                     }
+                    "trigger_fired" -> {
+                        // TriggerEvaluator fired a stored trigger. Start the agent loop
+                        // only when it is currently idle — never interrupt a running task.
+                        val goal   = data["goal"] as? String ?: return@collect
+                        val appPkg = data["appPackage"] as? String ?: ""
+                        val kind   = data["triggerType"] as? String ?: "UNKNOWN"
+                        if (goal.isNotBlank() && AgentLoop.state.status == AgentLoop.Status.IDLE) {
+                            Log.i(TAG, "Trigger ($kind) fired — launching goal: $goal")
+                            currentGoal       = goal
+                            currentAppPackage = appPkg
+                            currentStep       = 0
+                            autoRetryCount    = 0
+                            stopRequested     = false
+                            getSharedPreferences("aria_service_state", Context.MODE_PRIVATE).edit()
+                                .putString("currentGoal", goal)
+                                .putString("currentAppPackage", appPkg)
+                                .apply()
+                            updateNotification("Trigger ($kind): $goal")
+                            AgentLoop.start(this@AgentForegroundService, goal, appPkg)
+                        } else {
+                            Log.d(TAG, "Trigger ($kind) skipped — agent not idle (${AgentLoop.state.status})")
+                        }
+                    }
                 }
             }
         }
@@ -421,6 +457,8 @@ class AgentForegroundService : Service() {
 
         learningScheduler?.stop()
         learningScheduler = null
+        triggerEvaluator?.stop()
+        triggerEvaluator = null
         ThermalGuard.unregister(this)
 
         // FLAWS.md #1 — tear the orchestrator down before cancelling the

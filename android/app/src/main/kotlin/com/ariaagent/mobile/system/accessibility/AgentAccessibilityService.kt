@@ -162,8 +162,21 @@ class AgentAccessibilityService : AccessibilityService() {
                     }
 
                     if (!imeVisible) {
+                        val previousPackage = currentPackage
                         currentPackage  = pkg
                         currentActivity = cls
+                        // Emit app_focus_changed whenever the foreground app switches.
+                        // TriggerEvaluator subscribes to this event for APP_LAUNCH triggers.
+                        if (previousPackage != pkg) {
+                            AgentEventBus.emit(
+                                "app_focus_changed",
+                                mapOf(
+                                    "package"         to pkg,
+                                    "previousPackage" to (previousPackage ?: ""),
+                                )
+                            )
+                            Log.d(TAG, "App focus: $previousPackage → $pkg")
+                        }
                     }
                 }
 

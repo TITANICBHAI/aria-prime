@@ -102,6 +102,7 @@ object AgentLoop {
     private const val A11Y_SENTINEL_BACKOFF_INITIAL_MS = 250L
     private const val A11Y_SENTINEL_BACKOFF_MAX_MS     = 2_000L
     private const val STEP_DELAY_MS = 800L
+    private const val DEAD_NODE_THRESHOLD = 3  // consecutive gesture failures before injecting dead-node hint
     private const val SCREEN_SETTLE_MS = 600L
     private const val WAIT_RETRY_DELAY_MS = 1200L
 
@@ -185,6 +186,13 @@ object AgentLoop {
             var sameHashCount   = 0
             var lastScreenHash  = ""
             var stuckHint       = ""
+
+            // ── Dead A11y node tracking (GAP_AUDIT §4) ─────────────────────────
+            // If GestureEngine fails on the same nodeId DEAD_NODE_THRESHOLD times
+            // in a row, the node likely no longer exists in the UI tree. We inject
+            // a stuckHint so the LLM stops targeting it and looks for alternatives.
+            // Cleared on success so transient failures do not permanently blacklist nodes.
+            val nodeFailureMap = mutableMapOf<String, Int>()
 
             // ── Task chaining step budget ──────────────────────────────────────
             // stepsInCurrentSubTask is reset to 0 each time we advance to a new
@@ -786,6 +794,23 @@ object AgentLoop {
                             // No region available (e.g. Back action, or a11y node not found)
                             delay(SCREEN_SETTLE_MS)
                             gestureSuccess
+                        }
+
+                        // ── Dead A11y node tracking (GAP_AUDIT §4) ──────────────────────────
+                        // Count consecutive GestureEngine failures per nodeId. After
+                        // DEAD_NODE_THRESHOLD failures the LLM is nudged to avoid that element.
+                        // On success the counter is cleared — transient failures are not penalised.
+                        if (!gestureSuccess && actedNodeId != null) {
+                            val failCount = (nodeFailureMap[actedNodeId] ?: 0) + 1
+                            nodeFailureMap[actedNodeId] = failCount
+                            if (failCount >= DEAD_NODE_THRESHOLD && stuckHint.isBlank()) {
+                                stuckHint = "Node $actedNodeId has failed $failCount consecutive " +
+                                    "gesture dispatches — it likely no longer exists in the UI tree. " +
+                                    "Target a different element or scroll to find an alternative."
+                                Log.w("AgentLoop", "Dead node suspected: $actedNodeId (failures=$failCount)")
+                            }
+                        } else if (actedNodeId != null) {
+                            nodeFailureMap.remove(actedNodeId)
                         }
                     }
 

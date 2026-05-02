@@ -207,6 +207,17 @@ class LearningScheduler(private val context: Context) {
                 val loraVersion   = loraResult.loraVersion
                 val policyVersion = PolicyNetwork.adamStepCount
                 onLearningCycleComplete?.invoke(loraVersion, policyVersion)
+                // Publish to AgentEventBus so AgentViewModel.handleLearningComplete()
+                // receives the event and refreshes the Dashboard / TrainScreen.
+                // Previously this event was never emitted — the ViewModel handler
+                // existed but the bus message was never sent (GAP_AUDIT §3 fix).
+                AgentEventBus.emit(
+                    "learning_cycle_complete",
+                    mapOf(
+                        "loraVersion"    to loraVersion,
+                        "policyVersion"  to policyVersion,
+                    )
+                )
 
             } catch (e: Exception) {
                 Log.e(TAG, "Training cycle failed: ${e.message}")
