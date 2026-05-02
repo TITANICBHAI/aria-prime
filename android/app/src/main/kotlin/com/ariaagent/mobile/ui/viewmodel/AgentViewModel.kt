@@ -312,6 +312,16 @@ data class LoraTrainingProgress(
     val phase: String        = "preparing",
 )
 
+/**
+ * Round 7: one recently-completed goal entry shown in GoalsScreen Templates tab
+ * "Recently Completed" section so the user can instantly re-run a past task.
+ */
+data class RecentGoalItem(
+    val goal: String,
+    val appPackage: String,
+    val completedAt: Long,
+)
+
 /** Phase 15: notification shown when ARIA auto-chains to the next queued task. */
 data class ChainedTaskItem(
     val taskId: String,
@@ -603,6 +613,12 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _triggers = MutableStateFlow<List<TriggerItem>>(emptyList())
     val triggers: StateFlow<List<TriggerItem>> = _triggers.asStateFlow()
 
+    // ── Round 7: recently completed goals (max 6) ─────────────────────────────
+    // Populated in handleStatusChanged whenever status transitions from "running"
+    // to "idle"/"done". GoalsScreen.TemplatesTab surfaces them for one-tap re-run.
+    private val _recentGoals = MutableStateFlow<List<RecentGoalItem>>(emptyList())
+    val recentGoals: StateFlow<List<RecentGoalItem>> = _recentGoals.asStateFlow()
+
     // ── LoRA training history + live progress ─────────────────────────────────
     private val _loraHistory = MutableStateFlow<List<LoraCheckpointItem>>(emptyList())
     val loraHistory: StateFlow<List<LoraCheckpointItem>> = _loraHistory.asStateFlow()
@@ -714,6 +730,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun handleStatusChanged(data: Map<String, Any>) {
         val status = data["status"] as? String ?: return
+        val prevState = _agentState.value  // capture before update for recent-goals logic
         _agentState.update { prev -> prev.copy(
             status      = status,
             currentTask = data["currentTask"] as? String ?: prev.currentTask,
@@ -727,6 +744,21 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             _streamBuffer.value = ""
             _stepState.value = StepUiState()
             stopFloatingChat()
+        }
+        // Round 7: record completed goals for the Templates tab "Recently Completed" section.
+        // Only push when a real task just finished (was running → now idle/done).
+        if ((status == "idle" || status == "done") &&
+            prevState.status == "running" &&
+            prevState.currentTask.isNotBlank()
+        ) {
+            val entry = RecentGoalItem(
+                goal       = prevState.currentTask,
+                appPackage = prevState.currentApp,
+                completedAt = System.currentTimeMillis(),
+            )
+            _recentGoals.update { prev ->
+                (listOf(entry) + prev.filter { it.goal != entry.goal }).take(6)
+            }
         }
     }
 

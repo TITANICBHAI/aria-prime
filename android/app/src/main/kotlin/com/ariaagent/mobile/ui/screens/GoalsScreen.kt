@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -38,6 +39,7 @@ import com.ariaagent.mobile.core.triggers.TriggerType
 import com.ariaagent.mobile.ui.theme.ARIAColors
 import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
 import com.ariaagent.mobile.ui.viewmodel.QueuedTaskItem
+import com.ariaagent.mobile.ui.viewmodel.RecentGoalItem
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -81,6 +83,7 @@ fun GoalsScreen(
     onBack: () -> Unit,
 ) {
     val taskQueue    by vm.taskQueue.collectAsStateWithLifecycle()
+    val recentGoals  by vm.recentGoals.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
     var activeTab      by remember { mutableStateOf(GoalsTab.Queue) }
@@ -201,6 +204,7 @@ fun GoalsScreen(
                 onRemove      = { vm.removeQueuedTask(it) },
             )
             GoalsTab.Templates -> TemplatesTab(
+                recentGoals = recentGoals,
                 onEnqueue = { goal, app ->
                     vm.enqueueTask(goal, app, 0)
                     activeTab = GoalsTab.Queue
@@ -447,7 +451,10 @@ private fun QueueTaskRow(task: QueuedTaskItem, onRemove: () -> Unit) {
 // ─── Templates tab ────────────────────────────────────────────────────────────
 
 @Composable
-private fun TemplatesTab(onEnqueue: (goal: String, app: String) -> Unit) {
+private fun TemplatesTab(
+    recentGoals: List<RecentGoalItem>,
+    onEnqueue: (goal: String, app: String) -> Unit,
+) {
     var enqueuedLabel by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(enqueuedLabel) {
@@ -469,6 +476,39 @@ private fun TemplatesTab(onEnqueue: (goal: String, app: String) -> Unit) {
             }
         }
 
+        // ── Recently completed (only shown when the agent has finished at least one task) ──
+        if (recentGoals.isNotEmpty()) {
+            Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
+                Text(
+                    "RECENTLY COMPLETED",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Muted,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        letterSpacing = 1.sp,
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(end = 4.dp),
+                ) {
+                    androidx.compose.foundation.lazy.items(recentGoals) { recent ->
+                        RecentGoalChip(
+                            recent = recent,
+                            onClick = {
+                                onEnqueue(recent.goal, recent.appPackage)
+                                enqueuedLabel = recent.goal.take(30)
+                            }
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                color = ARIAColors.Divider, thickness = 0.5.dp,
+            )
+        }
+
         LazyVerticalGrid(
             columns         = GridCells.Fixed(2),
             modifier        = Modifier.fillMaxSize(),
@@ -481,6 +521,52 @@ private fun TemplatesTab(onEnqueue: (goal: String, app: String) -> Unit) {
                     onEnqueue(goal, app)
                     enqueuedLabel = title
                 })
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentGoalChip(recent: RecentGoalItem, onClick: () -> Unit) {
+    val appLabel = recent.appPackage.substringAfterLast('.').ifBlank { "" }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(ARIAColors.Primary.copy(alpha = 0.10f))
+            .border(1.dp, ARIAColors.Primary.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.Replay,
+            contentDescription = "Re-run",
+            tint = ARIAColors.Primary,
+            modifier = Modifier.size(14.dp),
+        )
+        Column {
+            Text(
+                text = recent.goal.take(38).let { if (recent.goal.length > 38) "$it…" else it },
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = ARIAColors.OnSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                ),
+                maxLines = 1,
+            )
+            if (appLabel.isNotBlank()) {
+                Text(
+                    text = appLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Primary.copy(alpha = 0.8f),
+                        fontSize = 9.sp,
+                    ),
+                )
             }
         }
     }

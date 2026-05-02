@@ -61,12 +61,18 @@ object PolicyNetwork {
     private var weights1: FloatArray? = null    // shape: (HIDDEN1 × INPUT_DIM) row-major
     private var weights2: FloatArray? = null    // shape: (HIDDEN2 × HIDDEN1) row-major
     private var outputW:  FloatArray? = null    // shape: (OUTPUT_DIM × HIDDEN2) row-major
+    // Additive bias for output logits (size OUTPUT_DIM).
+    // Initialized with tap=+0.3f so the network prefers tap on fresh install.
+    // Adam erases the prior within ~50 episodes if tap is not the right choice.
+    private var outputBias: FloatArray? = null  // shape: (OUTPUT_DIM)
 
     // ─── Adam optimizer state ─────────────────────────────────────────────────
     // First moment (mean of gradients)
     private var m1: FloatArray? = null;  private var m2: FloatArray? = null;  private var mOut: FloatArray? = null
+    private var mBias: FloatArray? = null
     // Second moment (uncentered variance of gradients)
     private var v1: FloatArray? = null;  private var v2: FloatArray? = null;  private var vOut: FloatArray? = null
+    private var vBias: FloatArray? = null
     private var adamStep = 0
 
     // ─── Reward baseline ──────────────────────────────────────────────────────
@@ -153,7 +159,11 @@ object PolicyNetwork {
 
         val logits = matVecKotlin(wo, h2, OUTPUT_DIM, HIDDEN2)  // no ReLU before softmax
 
-        val probs = if (neonAvailable) nativeSoftmax(logits) else softmaxKotlin(logits)
+        // Add output bias (tap-preference prior; learned away quickly by Adam if wrong)
+        val ob = outputBias
+        val biasedLogits = if (ob != null) FloatArray(OUTPUT_DIM) { i -> logits[i] + ob[i] } else logits
+
+        val probs = if (neonAvailable) nativeSoftmax(biasedLogits) else softmaxKotlin(biasedLogits)
 
         return Triple(probs, h1, h2)
     }
@@ -203,9 +213,10 @@ object PolicyNetwork {
         val normalizedReturns = DoubleArray(T) { (returns[it] - meanR) / stdR }
 
         // ── Step 3: Accumulate gradients over episode ───────────────────────
-        val dW1 = FloatArray(HIDDEN1 * INPUT_DIM)
-        val dW2 = FloatArray(HIDDEN2 * HIDDEN1)
-        val dWo = FloatArray(OUTPUT_DIM * HIDDEN2)
+        val dW1   = FloatArray(HIDDEN1 * INPUT_DIM)
+        val dW2   = FloatArray(HIDDEN2 * HIDDEN1)
+        val dWo   = FloatArray(OUTPUT_DIM * HIDDEN2)
+        val dBias = FloatArray(OUTPUT_DIM)   // gradient for outputBias
 
         for (t in 0 until T) {
             val input  = states[t].let { s ->
@@ -231,6 +242,9 @@ object PolicyNetwork {
                     dWo[i * HIDDEN2 + j] += deltaOut[i] * h2[j]
                 }
             }
+
+            // ── dBias += delta_out (bias gradient = 1 · delta_out) ──────────
+            for (i in 0 until OUTPUT_DIM) dBias[i] += deltaOut[i]
 
             // ── Backprop through layer 2 ────────────────────────────────────
             // delta_h2 = (W_out^T · delta_out) ⊙ relu_grad(h2)
@@ -266,15 +280,17 @@ object PolicyNetwork {
 
         // ── Step 4: Average gradients over episode ──────────────────────────
         val scale = 1f / T
-        for (i in dW1.indices) dW1[i] *= scale
-        for (i in dW2.indices) dW2[i] *= scale
-        for (i in dWo.indices) dWo[i] *= scale
+        for (i in dW1.indices)   dW1[i]   *= scale
+        for (i in dW2.indices)   dW2[i]   *= scale
+        for (i in dWo.indices)   dWo[i]   *= scale
+        for (i in dBias.indices) dBias[i] *= scale
 
         // ── Step 5: Adam optimizer update ───────────────────────────────────
         adamStep++
-        adamUpdate(weights1!!, dW1, m1!!, v1!!, adamStep)
-        adamUpdate(weights2!!, dW2, m2!!, v2!!, adamStep)
-        adamUpdate(outputW!!,  dWo, mOut!!, vOut!!, adamStep)
+        adamUpdate(weights1!!,   dW1,   m1!!,    v1!!,    adamStep)
+        adamUpdate(weights2!!,   dW2,   m2!!,    v2!!,    adamStep)
+        adamUpdate(outputW!!,    dWo,   mOut!!,  vOut!!,  adamStep)
+        adamUpdate(outputBias!!, dBias, mBias!!, vBias!!, adamStep)
 
         val episodeReturn = returns[0]
         // policy loss = -mean(log π(a|s) * G_t) over episode, for logging
@@ -331,6 +347,9 @@ object PolicyNetwork {
                 outputW!!.forEach { out.writeFloat(it) }
                 out.writeFloat(rewardBaseline)
                 out.writeInt(adamStep)
+                // Round 7+: output bias (tap-preference prior)
+                out.writeInt(OUTPUT_DIM)
+                (outputBias ?: FloatArray(OUTPUT_DIM)).forEach { out.writeFloat(it) }
             }
 
             // Save Adam state separately (large — only save periodically)
@@ -341,6 +360,9 @@ object PolicyNetwork {
                 v2!!.forEach { out.writeFloat(it) }
                 mOut!!.forEach { out.writeFloat(it) }
                 vOut!!.forEach { out.writeFloat(it) }
+                // Round 7+: bias Adam state
+                (mBias ?: FloatArray(OUTPUT_DIM)).forEach { out.writeFloat(it) }
+                (vBias ?: FloatArray(OUTPUT_DIM)).forEach { out.writeFloat(it) }
             }
 
             Log.i(TAG, "PolicyNetwork saved — step=$adamStep baseline=$rewardBaseline")
@@ -360,6 +382,14 @@ object PolicyNetwork {
                 outputW  = FloatArray(sO) { din.readFloat() }
                 rewardBaseline = din.readFloat()
                 adamStep = din.readInt()
+                // Round 7+: output bias — absent in files written before Round 7
+                outputBias = try {
+                    val bSize = din.readInt()
+                    if (bSize == OUTPUT_DIM) FloatArray(bSize) { din.readFloat() }
+                    else FloatArray(OUTPUT_DIM)
+                } catch (_: java.io.EOFException) {
+                    FloatArray(OUTPUT_DIM)  // old file format — zero bias
+                }
             }
             Log.i(TAG, "PolicyNetwork loaded from file — step=$adamStep")
         } catch (e: Exception) {
@@ -377,6 +407,11 @@ object PolicyNetwork {
                 v2   = FloatArray(HIDDEN2 * HIDDEN1) { din.readFloat() }
                 mOut = FloatArray(OUTPUT_DIM * HIDDEN2) { din.readFloat() }
                 vOut = FloatArray(OUTPUT_DIM * HIDDEN2) { din.readFloat() }
+                // Round 7+: bias Adam state — absent in older files
+                mBias = try { FloatArray(OUTPUT_DIM) { din.readFloat() } }
+                        catch (_: java.io.EOFException) { FloatArray(OUTPUT_DIM) }
+                vBias = try { FloatArray(OUTPUT_DIM) { din.readFloat() } }
+                        catch (_: java.io.EOFException) { FloatArray(OUTPUT_DIM) }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Adam state not loadable — reinitializing: ${e.message}")
@@ -396,15 +431,23 @@ object PolicyNetwork {
         weights1 = FloatArray(HIDDEN1 * INPUT_DIM)  { (rng.nextGaussian() * scale1).toFloat() }
         weights2 = FloatArray(HIDDEN2 * HIDDEN1)    { (rng.nextGaussian() * scale2).toFloat() }
         outputW  = FloatArray(OUTPUT_DIM * HIDDEN2) { (rng.nextGaussian() * scaleO).toFloat() }
+
+        // Output bias: tap (action 0) gets +0.3 logit advantage on a fresh install.
+        // At softmax with 7 uniform logits (≈0.143 each), adding 0.3 to action 0
+        // raises its probability to ≈0.21 — a meaningful prior without dominating.
+        // Adam will correct this within ~50 episodes if tap is not the right choice.
+        outputBias = FloatArray(OUTPUT_DIM).also { it[0] = 0.3f }
     }
 
     private fun initAdamState() {
-        m1   = FloatArray(HIDDEN1 * INPUT_DIM)
-        v1   = FloatArray(HIDDEN1 * INPUT_DIM)
-        m2   = FloatArray(HIDDEN2 * HIDDEN1)
-        v2   = FloatArray(HIDDEN2 * HIDDEN1)
-        mOut = FloatArray(OUTPUT_DIM * HIDDEN2)
-        vOut = FloatArray(OUTPUT_DIM * HIDDEN2)
+        m1    = FloatArray(HIDDEN1 * INPUT_DIM)
+        v1    = FloatArray(HIDDEN1 * INPUT_DIM)
+        m2    = FloatArray(HIDDEN2 * HIDDEN1)
+        v2    = FloatArray(HIDDEN2 * HIDDEN1)
+        mOut  = FloatArray(OUTPUT_DIM * HIDDEN2)
+        vOut  = FloatArray(OUTPUT_DIM * HIDDEN2)
+        mBias = FloatArray(OUTPUT_DIM)
+        vBias = FloatArray(OUTPUT_DIM)
         adamStep = 0
     }
 

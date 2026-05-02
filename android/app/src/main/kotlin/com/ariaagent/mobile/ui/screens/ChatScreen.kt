@@ -137,6 +137,7 @@ fun ChatScreen(vm: AgentViewModel) {
         }
 
         PresetChips(
+            status   = agentState.status,
             enabled  = !thinking && llmLoaded,
             onSelect = { chip ->
                 vm.sendChatMessage(chip)
@@ -389,21 +390,47 @@ private fun TypingIndicator() {
 
 // ─── Preset prompt chips ──────────────────────────────────────────────────────
 
-private val PRESET_PROMPTS = listOf(
-    "What are you doing?",
-    "Pause and explain",
-    "How is the model performing?",
-    "What did you learn?",
-    "Show memory summary",
-)
+/**
+ * Returns context-aware chip suggestions based on the agent's current status.
+ *
+ * Round 7: chips are no longer a static list — they adapt to what the agent is
+ * currently doing so every prompt is immediately useful rather than generic.
+ */
+private fun presetPromptsFor(status: String): List<String> = when (status) {
+    "running", "acting", "thinking", "observing" -> listOf(
+        "What are you doing?",
+        "Why that action?",
+        "Pause and explain",
+        "Show step progress",
+        "How is the model?",
+        "What did you learn?",
+    )
+    "error", "failed" -> listOf(
+        "What went wrong?",
+        "How do I fix this?",
+        "Analyze the failure",
+        "Retry strategy?",
+        "Show memory summary",
+        "What did you learn?",
+    )
+    else -> listOf(
+        "What can you do?",
+        "Tell me your status",
+        "Show memory summary",
+        "How is the model?",
+        "What have you learned?",
+        "Summarize your skills",
+    )
+}
 
 @Composable
-private fun PresetChips(enabled: Boolean, onSelect: (String) -> Unit) {
+private fun PresetChips(status: String, enabled: Boolean, onSelect: (String) -> Unit) {
+    val prompts = remember(status) { presetPromptsFor(status) }
     LazyRow(
         contentPadding          = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement   = Arrangement.spacedBy(8.dp),
     ) {
-        items(PRESET_PROMPTS) { prompt ->
+        items(prompts) { prompt ->
             FilterChip(
                 selected = false,
                 onClick  = { if (enabled) onSelect(prompt) },

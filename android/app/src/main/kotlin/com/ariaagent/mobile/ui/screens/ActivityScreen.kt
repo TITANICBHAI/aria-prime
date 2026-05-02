@@ -39,22 +39,20 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * ActivityScreen — Actions tab + Memory tab with full feature parity to logs.tsx.
+ * ActivityScreen — Actions tab + Memory tab.
  *
- * RN reference: app/(tabs)/logs.tsx — 317 lines
- * DO NOT DELETE logs.tsx until this screen is verified on emulator. (Migration Phase 3)
+ * This is the canonical Kotlin/Compose implementation (Migration Phase 3 complete).
+ * Supersedes the legacy React Native logs.tsx (now dead code in artifacts/mobile/).
  *
- * Features matched from logs.tsx:
- *   - Tab bar: Actions | Memory
- *   - Actions tab: live action log list with tool icon, description, app, timestamp, reward
- *   - Memory tab: ExperienceStore entries with summary, app, usage, confidence
- *   - Clear memory button (visible in memory tab when entries exist)
- *   - Per-tab empty state with different icon + message
- *   - Left-border colour coding (green = success, red = failure, violet = memory)
+ * Tabs:
+ *   Actions — live action log list with tool icon, description, app, timestamp, reward
+ *   Memory  — ExperienceStore entries with summary, app, usage, confidence
  *
- * Features added beyond RN:
+ * Additional features beyond the original RN screen:
  *   - Live "THINKING…" token stream card (shown during inference)
  *   - Step count badge in header
+ *   - Session Replay tab with per-step drill-down
+ *   - Left-border colour coding (green = success, red = failure, violet = memory)
  */
 @Composable
 fun ActivityScreen(vm: AgentViewModel = viewModel()) {
