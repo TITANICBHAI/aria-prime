@@ -76,8 +76,45 @@ class LearningScheduler(private val context: Context) {
             Log.i(TAG, "Training skipped — thermal level: ${ThermalGuard.currentLevel}")
             return
         }
+        // Round 9: skip if battery is critically low — never train below 20%
+        val batteryPct = getBatteryLevel()
+        if (batteryPct in 1..19) {
+            Log.i(TAG, "Training skipped — battery too low: $batteryPct%")
+            scope.launch {
+                AgentEventBus.emit("training_skipped_low_battery", mapOf("batteryPct" to batteryPct))
+            }
+            return
+        }
+        // Round 9: skip if available RAM < 900 MB — training needs ~800 MB headroom
+        val availRamMb = getAvailableRamMb()
+        if (availRamMb < 900) {
+            Log.i(TAG, "Training skipped — low RAM: ${availRamMb}MB available")
+            scope.launch {
+                AgentEventBus.emit("training_skipped_low_ram", mapOf("availRamMb" to availRamMb))
+            }
+            return
+        }
         if (!isDeviceIdle()) return
         runTrainingCycle()
+    }
+
+    /** Read current battery level (0–100). Returns 100 if not determinable (safe default). */
+    private fun getBatteryLevel(): Int {
+        return try {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+            bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                .takeIf { it in 0..100 } ?: 100
+        } catch (_: Exception) { 100 }
+    }
+
+    /** Free RAM visible to the app in megabytes via ActivityManager. */
+    private fun getAvailableRamMb(): Long {
+        return try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val mi = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(mi)
+            mi.availMem / 1_048_576L
+        } catch (_: Exception) { Long.MAX_VALUE }
     }
 
     private fun cancelTraining() {

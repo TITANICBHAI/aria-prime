@@ -1,5 +1,8 @@
 package com.ariaagent.mobile.core.monitoring
 
+import android.content.Context
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +54,12 @@ object LocalDeviceServer {
     @Volatile var running:     Boolean  = false
         private set
 
+    // ─── NSD (mDNS) service advertisement ────────────────────────────────────
+    private var nsdManager:          NsdManager?                       = null
+    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
+    @Volatile var nsdRegistered: Boolean = false
+        private set
+
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     fun start(port: Int = DEFAULT_PORT) {
@@ -79,12 +88,70 @@ object LocalDeviceServer {
     }
 
     fun stop() {
+        stopNsd()
         serverJob?.cancel()
         serverJob = null
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
         running = false
         Log.d(TAG, "stopped")
+    }
+
+    // ─── NSD helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Advertise this server via mDNS so the web dashboard can auto-discover
+     * the device IP without the user typing it manually.
+     *
+     * Service type : `_aria._tcp`
+     * Service name : `ARIA-Device` (Android appends digits if name is taken)
+     *
+     * Safe to call multiple times — unregisters the previous instance first.
+     * Requires ACCESS_WIFI_STATE permission (already declared for Wi-Fi IP lookup).
+     */
+    fun startNsd(context: Context) {
+        stopNsd()
+        try {
+            val nm = context.applicationContext.getSystemService(Context.NSD_SERVICE) as NsdManager
+            nsdManager = nm
+
+            val info = NsdServiceInfo().apply {
+                serviceName = "ARIA-Device"
+                serviceType = "_aria._tcp"
+                port        = currentPort
+            }
+
+            val listener = object : NsdManager.RegistrationListener {
+                override fun onRegistrationFailed(si: NsdServiceInfo, code: Int) {
+                    Log.w(TAG, "NSD registration failed: $code")
+                    nsdRegistered = false
+                }
+                override fun onUnregistrationFailed(si: NsdServiceInfo, code: Int) {
+                    Log.w(TAG, "NSD unregistration failed: $code")
+                }
+                override fun onServiceRegistered(si: NsdServiceInfo) {
+                    Log.i(TAG, "NSD registered as '${si.serviceName}' on port $currentPort")
+                    nsdRegistered = true
+                }
+                override fun onServiceUnregistered(si: NsdServiceInfo) {
+                    Log.d(TAG, "NSD unregistered")
+                    nsdRegistered = false
+                }
+            }
+            nsdRegistrationListener = listener
+            nm.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
+        } catch (e: Exception) {
+            Log.w(TAG, "NSD start failed (non-fatal): ${e.message}")
+        }
+    }
+
+    fun stopNsd() {
+        try {
+            nsdRegistrationListener?.let { nsdManager?.unregisterService(it) }
+        } catch (_: Exception) {}
+        nsdRegistrationListener = null
+        nsdManager              = null
+        nsdRegistered           = false
     }
 
     // ─── Device IP ────────────────────────────────────────────────────────────

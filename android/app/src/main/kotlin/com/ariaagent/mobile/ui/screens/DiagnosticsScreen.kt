@@ -2,6 +2,7 @@
 
 package com.ariaagent.mobile.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,7 +29,10 @@ import com.ariaagent.mobile.ui.theme.ARIAColors
 import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
 import com.ariaagent.mobile.ui.viewmodel.OrchestrationComponentUi
 import com.ariaagent.mobile.ui.viewmodel.OrchestrationEventUi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -232,9 +238,88 @@ fun DiagnosticsScreen(
                 events.forEach { evt -> EventRow(evt) }
             }
 
+            // ── Crash / error log viewer ─────────────────────────────────────
+            val context = LocalContext.current
+            var crashLines by remember { mutableStateOf<List<String>>(emptyList()) }
+            var logExpanded by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                crashLines = withContext(Dispatchers.IO) { readLastLogLines(context, 60) }
+            }
+
+            Text(
+                "ON-DEVICE LOG (last lines)",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = ARIAColors.Accent, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
+                )
+            )
+            ARIACard {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            if (crashLines.isEmpty()) "No log file found"
+                            else "${crashLines.size} lines from app.log",
+                            style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                        )
+                        if (crashLines.isNotEmpty()) {
+                            TextButton(
+                                onClick = { logExpanded = !logExpanded },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    if (logExpanded) "Collapse" else "Expand",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = ARIAColors.Primary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    if (logExpanded && crashLines.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(ARIAColors.Background, RoundedCornerShape(6.dp))
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                crashLines.takeLast(40).joinToString("\n"),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color      = ARIAColors.OnSurface,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize   = 10.sp,
+                                    lineHeight = 14.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
         }
     }
+}
+
+// ─── Log reader helper ────────────────────────────────────────────────────────
+
+/**
+ * Reads the last [maxLines] from the rolling `app.log` file written by
+ * [com.ariaagent.mobile.core.logging.FileLogWriter].
+ * Returns an empty list if the file does not exist yet.
+ */
+private fun readLastLogLines(context: Context, maxLines: Int): List<String> {
+    return try {
+        val logDir  = File(context.filesDir, "logs")
+        val logFile = File(logDir, "app.log")
+        if (!logFile.exists()) return emptyList()
+        val allLines = logFile.readLines(Charsets.UTF_8)
+        allLines.takeLast(maxLines)
+    } catch (_: Exception) { emptyList() }
 }
 
 // ─── Sub-composables ──────────────────────────────────────────────────────────

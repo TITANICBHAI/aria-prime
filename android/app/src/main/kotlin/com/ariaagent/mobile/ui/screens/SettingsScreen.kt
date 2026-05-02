@@ -1025,6 +1025,44 @@ fun SettingsScreen(
             )
         }
 
+        // ── Build Info ────────────────────────────────────────────────────────
+        SectionLabel("Build Info")
+
+        SettingsCard {
+            val isStubMode = com.ariaagent.mobile.core.ai.LlamaEngine.isStubMode
+            val apiLevel   = android.os.Build.VERSION.SDK_INT
+            val device     = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+            val abi        = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+            val buildType  = if (isStubMode) "Stub (JNI not compiled)" else "Native (llama.cpp JNI)"
+
+            listOf(
+                "Device"      to device,
+                "Android API" to "Level $apiLevel",
+                "ABI"         to abi,
+                "Inference"   to buildType,
+                "Stub mode"   to if (isStubMode) "Yes — keyword-aware stubs active" else "No — real JNI inference",
+            ).forEach { (key, value) ->
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        key,
+                        style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                    )
+                    Text(
+                        value,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color      = if (isStubMode && key == "Stub mode") ARIAColors.Warning
+                                         else ARIAColors.OnSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+        }
+
         // ── On-device privacy note ─────────────────────────────────────────────
         Row(
             modifier              = Modifier.fillMaxWidth(),

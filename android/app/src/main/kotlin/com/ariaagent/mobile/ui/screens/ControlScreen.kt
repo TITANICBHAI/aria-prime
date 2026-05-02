@@ -166,6 +166,67 @@ fun ControlScreen(
             HardwareMeterRow(stats = hwStats)
         }
 
+        // ── Permissions banner ────────────────────────────────────────────────
+        // Shown whenever a required permission is missing so the user knows
+        // exactly what to fix before starting the agent.
+        val missingA11y   = !moduleState.accessibilityGranted
+        val missingCapture = !moduleState.screenCaptureGranted
+        if (missingA11y || missingCapture) {
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(10.dp),
+                colors    = CardDefaults.cardColors(
+                    containerColor = ARIAColors.Warning.copy(alpha = 0.10f)
+                ),
+                elevation = CardDefaults.cardElevation(0.dp),
+                border    = androidx.compose.foundation.BorderStroke(
+                    1.dp, ARIAColors.Warning.copy(alpha = 0.45f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.WarningAmber, contentDescription = null,
+                            tint = ARIAColors.Warning, modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "PERMISSIONS NEEDED",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Warning,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        )
+                    }
+                    if (missingA11y) {
+                        PermissionRow(
+                            label  = "Accessibility Service",
+                            detail = "Allows ARIA to see and interact with other apps",
+                            onClick = {
+                                context.startActivity(
+                                    android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        )
+                    }
+                    if (missingCapture) {
+                        PermissionRow(
+                            label  = "Screen Capture",
+                            detail = "Lets ARIA observe the screen — needed for vision",
+                            onClick = null
+                        )
+                    }
+                }
+            }
+        }
+
         // ── Chained task notification banner ───────────────────────────────────
         chainedTask?.let { chain ->
             ARIACard(
@@ -796,6 +857,61 @@ fun ControlScreen(
 }
 
 // ─── Private composables ──────────────────────────────────────────────────────
+
+/**
+ * Single-row item inside the permission banner.
+ * If [onClick] is non-null the row is tappable and navigates to the relevant setting.
+ */
+@Composable
+private fun PermissionRow(
+    label:   String,
+    detail:  String,
+    onClick: (() -> Unit)?,
+) {
+    val rowMod = if (onClick != null)
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+    else
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+
+    Row(
+        modifier              = rowMod,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        Icon(
+            if (onClick != null) Icons.Default.OpenInNew else Icons.Default.Lock,
+            contentDescription = null,
+            tint     = if (onClick != null) ARIAColors.Warning else ARIAColors.Muted,
+            modifier = Modifier.size(14.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color      = ARIAColors.OnSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+            )
+        }
+        if (onClick != null) {
+            Text(
+                "Fix →",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = ARIAColors.Warning, fontWeight = FontWeight.Bold
+                )
+            )
+        }
+    }
+}
 
 @Composable
 private fun QueuedTaskRow(

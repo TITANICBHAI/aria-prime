@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -644,6 +645,19 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _sessionStats = MutableStateFlow(SessionStatsUiState(sessionStartMs = System.currentTimeMillis()))
     val sessionStats: StateFlow<SessionStatsUiState> = _sessionStats.asStateFlow()
 
+    // ── Round 9: live battery level (0–100) ───────────────────────────────────
+    // Polled from BatteryManager PROPERTY_CAPACITY on init and whenever the
+    // agent status changes. DashboardScreen and ControlScreen can show this.
+    private val _batteryLevel = MutableStateFlow(100)
+    val batteryLevel: StateFlow<Int> = _batteryLevel.asStateFlow()
+
+    // ── Round 9: combined permissions gate ───────────────────────────────────
+    // True only when both accessibility + screen-capture are granted.
+    // Single derived StateFlow — evaluated lazily once viewModelScope is live.
+    val permissionsAllGood: StateFlow<Boolean> = _moduleState.map {
+        it.accessibilityGranted && it.screenCaptureGranted
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // ── LoRA training history + live progress ─────────────────────────────────
     private val _loraHistory = MutableStateFlow<List<LoraCheckpointItem>>(emptyList())
     val loraHistory: StateFlow<List<LoraCheckpointItem>> = _loraHistory.asStateFlow()
@@ -681,6 +695,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     init {
         restoreLlmSlots()
         refreshModuleState()
+        refreshBatteryLevel()
         refreshTaskQueue()
         refreshAppSkills()
         checkOnboardingComplete()
@@ -1470,10 +1485,23 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 LocalDeviceServer.stop()
             } else {
                 LocalDeviceServer.start()
+                // Round 9: advertise via mDNS so dashboard can auto-discover device IP
+                LocalDeviceServer.startNsd(context)
                 MonitoringPusher.start(context)
             }
             refreshModuleState()
         }
+    }
+
+    /** Refresh the live battery level from BatteryManager. */
+    fun refreshBatteryLevel() {
+        try {
+            val bm = context.getSystemService(android.content.Context.BATTERY_SERVICE)
+                as android.os.BatteryManager
+            _batteryLevel.value = bm.getIntProperty(
+                android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY
+            ).coerceIn(0, 100)
+        } catch (_: Exception) {}
     }
 
     // ─── Gap 7: Object label management ──────────────────────────────────────
