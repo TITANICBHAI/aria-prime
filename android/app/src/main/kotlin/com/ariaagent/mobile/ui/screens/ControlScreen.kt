@@ -96,6 +96,7 @@ fun ControlScreen(
     val chainedTask  by vm.chainedTask.collectAsStateWithLifecycle()
     val loadedLlms   by vm.loadedLlms.collectAsStateWithLifecycle()
     val recentGoals  by vm.recentGoals.collectAsStateWithLifecycle()
+    val networkType  by vm.networkType.collectAsStateWithLifecycle()
     val hwStats      by vm.hardwareStats.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val activeModel  = remember { ModelManager.activeEntry(context) }
@@ -116,6 +117,8 @@ fun ControlScreen(
             && moduleState.modelLoaded
             && moduleState.accessibilityGranted
     val queueAtCapacity = taskQueue.size >= 20  // TaskQueueManager.MAX_QUEUE_SIZE
+    // Round 15 §84: queue priority for the Add-to-Queue flow (-1=Low, 0=Normal, 1=High).
+    var queuePriority by remember { mutableIntStateOf(0) }
 
     // Round 14 §74: packages that match keywords found in the typed goal text.
     val packageSuggests = remember(goalText) {
@@ -571,6 +574,25 @@ fun ControlScreen(
             }
         }
 
+        // Round 15 §91: metered network warning — visible when on mobile data and agent is idle.
+        if (networkType == "mobile" && isIdle) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ARIAColors.Warning.copy(alpha = 0.10f))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.SignalCellularAlt, null, tint = ARIAColors.Warning, modifier = Modifier.size(16.dp))
+                Text(
+                    "Mobile data detected — large inference tasks may use significant data.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Warning)
+                )
+            }
+        }
+
         // ── Learn-only mode toggle ────────────────────────────────────────────
         ARIACard(
             containerColor = if (learnOnly)
@@ -856,14 +878,49 @@ fun ControlScreen(
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 maxLines = 1,
             )
+            // Round 15 §84: priority selector chips for the queue.
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "PRIORITY",
+                style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp)
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(-1 to "Low", 0 to "Normal", 1 to "High").forEach { (p, label) ->
+                    val selected = queuePriority == p
+                    val chipColor = when (p) {
+                        1    -> ARIAColors.Destructive
+                        -1   -> ARIAColors.Muted
+                        else -> ARIAColors.Accent
+                    }
+                    FilterChip(
+                        selected = selected,
+                        onClick  = { queuePriority = p },
+                        label    = {
+                            Text(label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+                        },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = chipColor.copy(alpha = 0.18f),
+                            selectedLabelColor     = chipColor,
+                        ),
+                        border   = FilterChipDefaults.filterChipBorder(
+                            enabled          = true,
+                            selected         = selected,
+                            selectedBorderColor = chipColor.copy(alpha = 0.55f),
+                            borderColor         = ARIAColors.Divider,
+                        )
+                    )
+                }
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = {
                     if (queueGoal.isNotBlank()) {
                         focusManager.clearFocus()
-                        vm.enqueueTask(queueGoal.trim(), queueApp.trim())
-                        queueGoal = ""
-                        queueApp  = ""
+                        vm.enqueueTask(queueGoal.trim(), queueApp.trim(), queuePriority)
+                        queueGoal     = ""
+                        queueApp      = ""
+                        queuePriority = 0
                     }
                 },
                 enabled = queueGoal.isNotBlank() && !queueAtCapacity,

@@ -456,6 +456,15 @@ private fun TemplatesTab(
     onEnqueue: (goal: String, app: String) -> Unit,
 ) {
     var enqueuedLabel by remember { mutableStateOf<String?>(null) }
+    // Round 15 §83: template search filter.
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredTemplates = remember(searchQuery) {
+        if (searchQuery.isBlank()) GOAL_TEMPLATES
+        else GOAL_TEMPLATES.filter { (title, goal, _) ->
+            title.contains(searchQuery, ignoreCase = true) ||
+            goal.contains(searchQuery, ignoreCase = true)
+        }
+    }
 
     LaunchedEffect(enqueuedLabel) {
         if (enqueuedLabel != null) {
@@ -475,6 +484,44 @@ private fun TemplatesTab(
                 Text("\"$label\" added to queue", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Success))
             }
         }
+
+        // Round 15 §83: template search bar.
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            placeholder = {
+                Text(
+                    "Search templates…",
+                    style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = ARIAColors.Muted,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            trailingIcon = {
+                if (searchQuery.isNotBlank()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(16.dp))
+                    }
+                }
+            },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = ARIAColors.Primary,
+                unfocusedBorderColor = ARIAColors.Divider,
+                focusedTextColor     = ARIAColors.OnSurface,
+                unfocusedTextColor   = ARIAColors.OnSurface,
+                cursorColor          = ARIAColors.Primary,
+            ),
+        )
 
         // ── Recently completed (only shown when the agent has finished at least one task) ──
         if (recentGoals.isNotEmpty()) {
@@ -516,7 +563,7 @@ private fun TemplatesTab(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement   = Arrangement.spacedBy(10.dp)
         ) {
-            items(GOAL_TEMPLATES) { (title, goal, app) ->
+            items(filteredTemplates) { (title, goal, app) ->
                 TemplateCard(title = title, goal = goal, app = app, onClick = {
                     onEnqueue(goal, app)
                     enqueuedLabel = title

@@ -1059,6 +1059,47 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(6.dp))
+
+            // Round 15 §88: Reset Config to Defaults — restores AriaConfig() factory values.
+            var showResetConfigDialog by remember { mutableStateOf(false) }
+            if (showResetConfigDialog) {
+                AlertDialog(
+                    onDismissRequest = { showResetConfigDialog = false },
+                    title = { Text("Reset Configuration?") },
+                    text  = { Text("All model parameters will be reset to factory defaults. The change takes effect after saving.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showResetConfigDialog = false
+                            vm.saveConfig(AriaConfig())
+                            saveSuccess = true
+                        }) { Text("Reset", color = ARIAColors.Destructive) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetConfigDialog = false }) {
+                            Text("Cancel", color = ARIAColors.Muted)
+                        }
+                    }
+                )
+            }
+            SettingsCard {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedButton(
+                    onClick  = { showResetConfigDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = ARIAColors.Muted),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Divider),
+                    shape    = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.SettingsBackupRestore, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reset Config to Defaults", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+            }
+
+            Spacer(Modifier.height(6.dp))
             Text(
                 "Clear Memory removes experience entries and embeddings. " +
                 "Reset Agent clears all learned progress, skills, and task history.",

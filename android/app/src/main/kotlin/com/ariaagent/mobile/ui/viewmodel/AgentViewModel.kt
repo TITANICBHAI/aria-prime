@@ -1896,6 +1896,49 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     // ─── Migration Phase 2/3: danger zone actions (added beyond RN) ──────────
 
     /**
+     * Round 15 §90: dismiss an ERROR status without clearing session data.
+     * Used by Dashboard "Dismiss" quick action after a task failure.
+     */
+    fun clearError() {
+        _agentState.update { it.copy(status = "idle", lastError = "") }
+    }
+
+    /**
+     * Round 15 §92: serialize the current in-memory experience entries as JSON
+     * and launch the system share sheet so the user can export/inspect them.
+     */
+    fun exportMemory() {
+        viewModelScope.launch {
+            val entries = _memoryEntries.value
+            if (entries.isEmpty()) return@launch
+            val json = buildString {
+                appendLine("[")
+                entries.forEachIndexed { i, e ->
+                    appendLine("  {")
+                    appendLine("    \"app\": \"${e.app.replace("\"", "\\\"")}\",")
+                    appendLine("    \"summary\": \"${e.summary.take(100).replace("\"", "\\\"")}\",")
+                    appendLine("    \"result\": \"${e.result}\",")
+                    appendLine("    \"reward\": ${String.format("%.3f", e.reward)},")
+                    appendLine("    \"taskType\": \"${e.taskType}\",")
+                    appendLine("    \"isEdgeCase\": ${e.isEdgeCase}")
+                    if (i < entries.size - 1) appendLine("  },") else appendLine("  }")
+                }
+                append("]")
+            }
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, json)
+                        putExtra(Intent.EXTRA_SUBJECT, "ARIA Memory Export (${entries.size} entries)")
+                    },
+                    "Export Memory"
+                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            )
+        }
+    }
+
+    /**
      * Clear all experience store entries and embeddings.
      * Triggered by "Clear Memory" button in SettingsScreen and ActivityScreen.
      */

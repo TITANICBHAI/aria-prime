@@ -201,6 +201,53 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                 Spacer(Modifier.height(12.dp))
                 StepActivityBar(activity = stepState.activity, stepNumber = stepState.stepNumber)
             }
+
+            // Round 15 §85: quick-action strip shown only on error — retry or dismiss.
+            if (agentState.status == "error") {
+                Spacer(Modifier.height(10.dp))
+                if (agentState.lastError.isNotBlank()) {
+                    Text(
+                        agentState.lastError,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Error,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize   = 9.sp
+                        ),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (agentState.currentTask.isNotBlank()) {
+                        Button(
+                            onClick  = { vm.startAgent(agentState.currentTask, agentState.currentApp) },
+                            modifier = Modifier.weight(1f),
+                            colors   = ButtonDefaults.buttonColors(containerColor = ARIAColors.Primary),
+                            shape    = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Replay, null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Retry Task", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick  = { vm.clearError() },
+                        modifier = if (agentState.currentTask.isNotBlank()) Modifier.weight(1f)
+                                   else Modifier.fillMaxWidth(),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = OutlinedButtonDefaults.colors(contentColor = ARIAColors.Muted),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Divider),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Dismiss", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    }
+                }
+            }
         }
 
         // ── Hardware meters ───────────────────────────────────────────────────

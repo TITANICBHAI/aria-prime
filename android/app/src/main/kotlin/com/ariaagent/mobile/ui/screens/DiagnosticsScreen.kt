@@ -297,12 +297,50 @@ fun DiagnosticsScreen(
                     )
                 )
                 if (progressLogBytes > 0L) {
-                    Text(
-                        "progress.txt: ${String.format("%.1f", progressLogBytes / 1024.0)} KB",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = ARIAColors.Muted, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    // Round 15 §86: clear progress.txt inline button with confirmation.
+                    var showClearProgressDialog by remember { mutableStateOf(false) }
+                    if (showClearProgressDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearProgressDialog = false },
+                            title = { Text("Clear Progress Log?") },
+                            text  = { Text("This will delete all task history in progress.txt. This cannot be undone.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showClearProgressDialog = false
+                                    kotlinx.coroutines.MainScope().launch {
+                                        withContext(Dispatchers.IO) {
+                                            com.ariaagent.mobile.core.persistence.ProgressPersistence.clear(context)
+                                        }
+                                        progressLogBytes = 0L
+                                    }
+                                }) { Text("Clear", color = ARIAColors.Destructive) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearProgressDialog = false }) {
+                                    Text("Cancel", color = ARIAColors.Muted)
+                                }
+                            }
                         )
-                    )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "progress.txt: ${String.format("%.1f", progressLogBytes / 1024.0)} KB",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Muted, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        )
+                        TextButton(
+                            onClick = { showClearProgressDialog = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Text("CLEAR", style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Destructive, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                            ))
+                        }
+                    }
                 }
             }
             ARIACard {

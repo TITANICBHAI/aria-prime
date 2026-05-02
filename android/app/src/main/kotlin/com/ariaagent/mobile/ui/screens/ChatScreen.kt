@@ -6,7 +6,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -270,6 +276,12 @@ private fun ContextTag(label: String) {
 
 @Composable
 private fun ChatBubble(msg: ChatMessageItem) {
+    val ctx = LocalContext.current
+    fun copyToClipboard(text: String) {
+        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("ARIA message", text))
+        android.widget.Toast.makeText(ctx, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+    }
     when (msg.role) {
         "system" -> {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -294,6 +306,10 @@ private fun ChatBubble(msg: ChatMessageItem) {
                             .fillMaxWidth(0.78f)
                             .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp))
                             .background(ARIAColors.Primary)
+                            // Round 15 §82: long-press copies message to clipboard.
+                            .pointerInput(msg.text) {
+                                detectTapGestures(onLongPress = { copyToClipboard(msg.text) })
+                            }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(msg.text, color = ARIAColors.Background, fontSize = 14.sp, lineHeight = 20.sp)
@@ -322,6 +338,10 @@ private fun ChatBubble(msg: ChatMessageItem) {
                             .fillMaxWidth(0.78f)
                             .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 4.dp, bottomEnd = 14.dp))
                             .background(ARIAColors.Surface1)
+                            // Round 15 §82: long-press copies assistant message to clipboard.
+                            .pointerInput(msg.text) {
+                                detectTapGestures(onLongPress = { copyToClipboard(msg.text) })
+                            }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(msg.text, color = ARIAColors.TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)

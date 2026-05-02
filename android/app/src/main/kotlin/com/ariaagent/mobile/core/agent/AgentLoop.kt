@@ -649,6 +649,12 @@ object AgentLoop {
                     val goalPlan = if (subTasksRaw.size > 1)
                         ProgressPersistence.goalSummary(context)
                     else ""
+                    // Round 15 §81: inject remaining budget hint at 80% step consumption.
+                    val stepsRemaining = MAX_STEPS - state.stepCount
+                    if (stepsRemaining <= MAX_STEPS / 5 && stuckHint.isBlank()) {
+                        stuckHint = "⚠ Budget warning: only $stepsRemaining steps remain in this session. " +
+                            "Wrap up and emit Done as soon as the goal is complete."
+                    }
                     val extendedMemory = (memory + visualMemory).take(5)
                     val prompt = PromptBuilder.build(
                         snapshot          = snapshot,
@@ -947,6 +953,15 @@ object AgentLoop {
                     val result = if (actionSuccess) "success" else "failure"
                     // Round 14 §70: adaptive step delay — track consecutive successes.
                     if (actionSuccess) consecutiveSuccesses++ else consecutiveSuccesses = 0
+
+                    // Round 15 §89: expose action failures to the event bus for analytics/logs.
+                    if (!actionSuccess) {
+                        AgentEventBus.emit("action_failed", mapOf(
+                            "step"       to state.stepCount,
+                            "appPackage" to state.currentApp,
+                            "actionJson" to actionJson.take(200),
+                        ))
+                    }
 
                     // ── 7. STORE — persist experience ────────────────────────
                     store.save(ExperienceStore.ExperienceTuple(

@@ -196,6 +196,24 @@ fun ActivityScreen(vm: AgentViewModel = viewModel()) {
                         )
                     }
                 }
+                // Round 15 §87: export memory button — shown in Memory tab when entries exist.
+                val showExportMemBtn = activeTab == ActivityTab.Memory && memoryEntries.isNotEmpty()
+                if (showExportMemBtn) {
+                    IconButton(
+                        onClick  = { vm.exportMemory() },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ARIAColors.Primary.copy(alpha = 0.13f))
+                            .size(34.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Upload,
+                            contentDescription = "Export memory as JSON",
+                            tint     = ARIAColors.Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
                 // Clear button — shown in Memory and Labels tabs when entries exist
                 val showClearBtn = (activeTab == ActivityTab.Memory && memoryEntries.isNotEmpty()) ||
                                    (activeTab == ActivityTab.Labels && allLabels.isNotEmpty())
