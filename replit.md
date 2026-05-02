@@ -77,6 +77,19 @@ server/              Python preview server for the Replit workspace
   8. **GAP_AUDIT §11 consistency fix** — `WAKE_LOCK` + `ONNX reflection` rows corrected from `[ ]` → `[x]`, now consistent with Priority table items 12–13.
   9. **LocalDeviceServer NSD** — `stopNsd()` unregisters cleanly on `stop()`. `nsdRegistered: Boolean` volatile flag exposed for module state inspection.
   **Files changed:** `LearningScheduler.kt`, `LocalDeviceServer.kt`, `ControlScreen.kt`, `DiagnosticsScreen.kt`, `SettingsScreen.kt`, `AgentViewModel.kt`, `GAP_AUDIT.md`, `replit.md`. **New:** `SessionStatsUiStateTest.kt`, `SafetyConfigTest.kt`.
+- 2026-05-02 — **Round 13 — closed 11 GAP_AUDIT items (§59–69):**
+  1. **`NetworkMonitor` (§59)** — New `core/system/NetworkMonitor.kt` with `connectionType(context): ConnectionType` (WIFI/MOBILE/NONE) using `ConnectivityManager.getNetworkCapabilities()`.
+  2. **`AgentViewModel.networkType` StateFlow (§60)** — `_networkType` polled every 30s from `NetworkMonitor`. Imports added: `NotificationManager`, `PendingIntent`, `NotificationCompat`, `NetworkMonitor`, `ComposeMainActivity`, `withContext`, `File`.
+  3. **`DashboardScreen` network chip (§61)** — Color-coded `NET WiFi` / `NET Mobile` / `OFFLINE` chip at the bottom of the Hardware card.
+  4. **`ThermalGuard.pauseDurationMs()` (§62)** — Scaled thermal pause: MODERATE=5s, SEVERE=15s, CRITICAL=30s. `AgentLoop` uses `pauseDurationMs().coerceAtLeast(10_000L)`.
+  5. **Vision description cache (§63)** — `lastVisionDescription` var; skips `VisionEngine.describe()` when `screenHash == lastScreenHash`, saving ~400ms/step.
+  6. **JSON parse-failure retry (§64)** — `MAX_PARSE_RETRIES=2`; repair prompt with `maxTokens=80`, `temperature=0.05` on `no action parsed`/`malformed json` fallback.
+  7. **`stuck_abort` `DONE`→`ERROR` fix (§65)** — Critical bug fix: stuck abort now correctly sets `Status.ERROR` instead of `Status.DONE`.
+  8. **stuckCount ≥ 6 Home press (§66)** — New recovery tier: Home press + hint before the ≥8 abort. `AgentAccessibilityService.performHome()` added.
+  9. **Task completion notifications (§67)** — `postTaskNotification()` posts OS notification on task done/error via `aria_agent_reasoning` channel.
+  10. **ActivityScreen share button (§68)** — Share icon button in ACTIVITY header exports last 100 actions as plain text via system share sheet.
+  11. **Chat history persistence (§69)** — `saveChatHistory()` + `loadChatHistory()` to/from `{filesDir}/aria_chat.json` (max 100 messages); called on send, clear, and cold start.
+  **Files changed:** `NetworkMonitor.kt` (new), `ThermalGuard.kt`, `AgentLoop.kt`, `AgentAccessibilityService.kt`, `AgentViewModel.kt`, `DashboardScreen.kt`, `ActivityScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-02 — **Round 12 — closed 10 GAP_AUDIT items (§49–58):**
   1. **`AgentLoop` consecutive-timeout abort (§49)** — `MAX_CONSECUTIVE_TIMEOUTS=3` constant. `consecutiveTimeouts` counter: reset to 0 on good inference, incremented on timeout. After 3 back-to-back timeouts: `status=ERROR`, `logTaskEnd`, `SustainedPerformanceManager.disable()`, `emitStatus()`, `break`. Prevents infinite spin on wedged JNI model.
   2. **`step_started` event enriched (§50)** — `"appPackage"` and `"goalText"` fields added to the `step_started` event payload so downstream analytics can correlate steps without additional lookups.

@@ -150,6 +150,18 @@ object ThermalGuard {
     /** True if all AI operations must stop immediately. */
     fun isEmergency(): Boolean = currentLevel >= ThermalLevel.SEVERE
 
+    /**
+     * Returns the recommended inference pause in milliseconds for the current thermal level.
+     * SAFE / LIGHT → no pause (0). MODERATE → 5 s. SEVERE → 15 s. CRITICAL → 30 s.
+     * AgentLoop uses this instead of a hardcoded 10 s flat delay (Round 13 §62).
+     */
+    fun pauseDurationMs(): Long = when (currentLevel) {
+        ThermalLevel.SAFE, ThermalLevel.LIGHT -> 0L
+        ThermalLevel.MODERATE                 -> 5_000L
+        ThermalLevel.SEVERE                   -> 15_000L
+        ThermalLevel.CRITICAL                 -> 30_000L
+    }
+
     // ─── Internal ─────────────────────────────────────────────────────────────
 
     private fun updateLevel(newLevel: ThermalLevel) {

@@ -166,6 +166,36 @@ fun ActivityScreen(vm: AgentViewModel = viewModel()) {
                         fontWeight = FontWeight.Bold
                     )
                 )
+                // Round 13: share action log button — visible when Actions tab has entries
+                val showShareBtn = activeTab == ActivityTab.Actions && actionLogs.isNotEmpty()
+                if (showShareBtn) {
+                    val localCtx = androidx.compose.ui.platform.LocalContext.current
+                    IconButton(
+                        onClick = {
+                            val fmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                            val text = actionLogs.take(100).joinToString("\n") { e ->
+                                "[${fmt.format(java.util.Date(e.timestamp))}] ${e.tool.uppercase()}: ${e.nodeId.take(50)} (${if (e.success) "ok" else "fail"})"
+                            }
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, "ARIA Action Log\n${"─".repeat(38)}\n$text")
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "ARIA Action Log")
+                            }
+                            localCtx.startActivity(android.content.Intent.createChooser(intent, "Share Action Log"))
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ARIAColors.Accent.copy(alpha = 0.13f))
+                            .size(38.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "Share log",
+                            tint     = ARIAColors.Accent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 // Clear button — shown in Memory and Labels tabs when entries exist
                 val showClearBtn = (activeTab == ActivityTab.Memory && memoryEntries.isNotEmpty()) ||
                                    (activeTab == ActivityTab.Labels && allLabels.isNotEmpty())

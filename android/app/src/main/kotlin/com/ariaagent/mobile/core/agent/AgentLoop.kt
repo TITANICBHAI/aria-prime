@@ -113,6 +113,8 @@ object AgentLoop {
     // Round 12: abort the task after this many back-to-back LLM timeouts — prevents
     // the loop from spinning indefinitely when the model is wedged or OOM-killed by the JVM.
     private const val MAX_CONSECUTIVE_TIMEOUTS = 3
+    // Round 13: max retries when the LLM output cannot be parsed as valid JSON action.
+    private const val MAX_PARSE_RETRIES = 2
 
     /**
      * Start the agent loop for a given goal.
@@ -202,6 +204,9 @@ object AgentLoop {
             // Round 12: track consecutive inference timeouts so MAX_CONSECUTIVE_TIMEOUTS
             // can abort the task rather than looping forever on a wedged model.
             var consecutiveTimeouts = 0
+            // Round 13: cache the last non-blank vision description so we can reuse it
+            // when the screen hash hasn't changed (skipping a ~400 ms SmolVLM call).
+            var lastVisionDescription = ""
 
             // ── Dead A11y node tracking (GAP_AUDIT §4) ─────────────────────────
             // If GestureEngine fails on the same nodeId DEAD_NODE_THRESHOLD times
@@ -495,7 +500,9 @@ object AgentLoop {
                             "lastAction" to state.lastAction,
                             "lastError" to "thermal_pause"
                         ))
-                        delay(10_000L)  // wait 10s then re-check
+                        // Round 13: scale pause by thermal severity instead of flat 10s.
+                        val thermalPauseMs = ThermalGuard.pauseDurationMs().coerceAtLeast(10_000L)
+                        delay(thermalPauseMs)  // MODERATE=10s min, SEVERE=15s, CRITICAL=30s
                         if (ThermalGuard.isEmergency()) break  // still hot → abort
                         state = state.copy(status = Status.RUNNING, lastError = "")
                     }
@@ -540,15 +547,26 @@ object AgentLoop {
                         snapshot.bitmap != null &&
                         VisionEngine.isVisionModelReady(context)
                     ) {
-                        runCatching {
-                            VisionEngine.describe(
-                                context     = context,
-                                bitmap      = snapshot.bitmap!!,
-                                goal        = goal,
-                                screenHash  = snapshot.screenHash()
-                            )
-                        }.getOrDefault("").also { desc ->
-                            if (desc.isNotBlank()) Log.d("AgentLoop", "Vision[${snapshot.screenHash()}]: $desc")
+                        val snapHash = snapshot.screenHash()
+                        if (snapHash == lastScreenHash && lastVisionDescription.isNotBlank()) {
+                            // Round 13: screen hasn't changed → reuse cached description,
+                            // saving ~400 ms of SmolVLM inference per unchanged step.
+                            Log.d("AgentLoop", "Vision cache-hit (hash=$snapHash) — reusing description")
+                            lastVisionDescription
+                        } else {
+                            runCatching {
+                                VisionEngine.describe(
+                                    context     = context,
+                                    bitmap      = snapshot.bitmap!!,
+                                    goal        = goal,
+                                    screenHash  = snapHash
+                                )
+                            }.getOrDefault("").also { desc ->
+                                if (desc.isNotBlank()) {
+                                    Log.d("AgentLoop", "Vision[$snapHash]: $desc")
+                                    lastVisionDescription = desc
+                                }
+                            }
                         }
                     } else ""
 
@@ -705,8 +723,30 @@ object AgentLoop {
                     consecutiveTimeouts = 0          // reset on successful inference
                     val rawOutput: String = rawOutputNullable
 
-                    // ── 4. PARSE ──────────────────────────────────────────────
-                    val actionJson = PromptBuilder.parseAction(rawOutput)
+                    // ── 4. PARSE + Round 13 repair retry ─────────────────────
+                    // If the model output contains no JSON object (or a malformed one),
+                    // re-prompt with a terse repair request before falling back to Wait.
+                    // MAX_PARSE_RETRIES = 2 so bad models don't triple the step time.
+                    var actionJson = PromptBuilder.parseAction(rawOutput)
+                    if (actionJson.contains("\"reason\":\"no action parsed\"") ||
+                        actionJson.contains("\"reason\":\"malformed json\"")) {
+                        for (repairAttempt in 1..MAX_PARSE_RETRIES) {
+                            Log.w("AgentLoop", "JSON parse failed (attempt $repairAttempt/$MAX_PARSE_RETRIES) — repair retry")
+                            val repairPrompt =
+                                "Return ONLY a single JSON action object — no prose, no code block.\n" +
+                                "Example: {\"tool\":\"Click\",\"node_id\":\"#submit\",\"reason\":\"continue\"}\n\n" +
+                                "Previous model output (last 300 chars):\n${rawOutput.takeLast(300)}\n\nJSON:"
+                            val repairedRaw = withTimeoutOrNull(25_000L) {
+                                LlamaEngine.infer(repairPrompt, maxTokens = 80, temperature = 0.05f)
+                            } ?: break
+                            val repaired = PromptBuilder.parseAction(repairedRaw)
+                            if (!repaired.contains("no action parsed") && !repaired.contains("malformed json")) {
+                                actionJson = repaired
+                                Log.i("AgentLoop", "Parse repaired on attempt $repairAttempt: $actionJson")
+                                break
+                            }
+                        }
+                    }
                     actionHistory.add(actionJson)
                     if (actionHistory.size > 10) actionHistory.removeAt(0)
 
@@ -730,15 +770,22 @@ object AgentLoop {
                             Log.w("AgentLoop", "Stuck count = $stuckCount (hash=$currentHash)")
                             stuckHint = when {
                                 stuckCount >= 8 -> {
-                                    // Abort — nothing we can do
-                                    Log.e("AgentLoop", "Stuck limit reached — aborting task")
-                                    state = state.copy(status = Status.DONE, lastError = "stuck_abort")
+                                    // Round 13 fix: was incorrectly Status.DONE — stuck is an ERROR.
+                                    Log.e("AgentLoop", "Stuck limit reached — aborting task as ERROR")
+                                    state = state.copy(status = Status.ERROR, lastError = "stuck_abort")
                                     ProgressPersistence.logTaskEnd(context, goal, succeeded = false)
                                     SustainedPerformanceManager.disable()
                                     emitStatus()
                                     recordAndChain(context, goal, lastAppPackage, succeeded = false,
                                         stepsTaken = state.stepCount, elementsTouched = elementsTouched)
                                     break
+                                }
+                                stuckCount >= 6 -> {
+                                    // Round 13: try Home press as a second-level recovery before aborting.
+                                    Log.w("AgentLoop", "Stuck $stuckCount — pressing Home to escape dead screen")
+                                    runCatching { AgentAccessibilityService.performHome() }
+                                    "Stuck for $stuckCount steps. A Home press was forced. " +
+                                    "Open the target app ($appPackage) again and try a completely different strategy."
                                 }
                                 stuckCount >= 5 -> {
                                     // Force Back to break out of dead-end screen

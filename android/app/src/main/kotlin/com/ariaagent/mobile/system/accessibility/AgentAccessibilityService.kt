@@ -106,6 +106,11 @@ class AgentAccessibilityService : AccessibilityService() {
             instance?.performGlobalAction(GLOBAL_ACTION_BACK)
         }
 
+        /** Round 13: press the Home button — used by AgentLoop stuck-recovery at stuckCount ≥ 6. */
+        fun performHome() {
+            instance?.performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+
         fun getScreenSize(): Pair<Int, Int> {
             val inst = instance ?: return Pair(1080, 2400)
             val dm = inst.resources.displayMetrics

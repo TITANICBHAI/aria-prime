@@ -39,8 +39,15 @@ import com.ariaagent.mobile.system.accessibility.AgentAccessibilityService
 import com.ariaagent.mobile.system.overlay.FloatingChatService
 import com.ariaagent.mobile.system.screen.ScreenCaptureService
 import org.json.JSONObject
+import android.app.NotificationManager
+import android.app.PendingIntent
+import androidx.core.app.NotificationCompat
+import com.ariaagent.mobile.core.system.NetworkMonitor
+import com.ariaagent.mobile.ui.ComposeMainActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import com.ariaagent.mobile.core.system.HardwareMonitor
 import com.ariaagent.mobile.core.system.HardwareMonitor.HardwareStats
 import com.ariaagent.mobile.core.triggers.TriggerItem
@@ -450,6 +457,11 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context = app.applicationContext
 
+    // ── Round 13 constants ────────────────────────────────────────────────────
+    private val TASK_NOTIF_ID      = 4001          // stable notification ID for task outcomes
+    private val CHAT_HISTORY_FILE  = "aria_chat.json"
+    private val CHAT_HISTORY_MAX   = 100           // max messages to persist on disk
+
     // ─── Observable state ─────────────────────────────────────────────────────
 
     private val _agentState   = MutableStateFlow(AgentUiState())
@@ -492,6 +504,10 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     // Migration Phase 3: memory entries for ActivityScreen Memory tab
     private val _memoryEntries = MutableStateFlow<List<MemoryEntry>>(emptyList())
     val memoryEntries: StateFlow<List<MemoryEntry>> = _memoryEntries.asStateFlow()
+
+    // Round 13: live network connection type — "wifi" / "mobile" / "none"
+    private val _networkType = MutableStateFlow("none")
+    val networkType: StateFlow<String> = _networkType.asStateFlow()
 
     // ── Migration Phase 5: Chat ───────────────────────────────────────────────
 
@@ -724,6 +740,17 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             com.ariaagent.mobile.core.persistence.ProgressPersistence.pruneOldLogs(context, daysToKeep = 7)
         }
 
+        // Round 13: poll network connectivity every 30 s so the Dashboard chip stays current.
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                _networkType.value = NetworkMonitor.connectionType(context).name.lowercase()
+                kotlinx.coroutines.delay(30_000L)
+            }
+        }
+
+        // Round 13: restore chat history from disk (non-blocking, best-effort).
+        loadChatHistory()
+
         // Auto-load vision model on startup if files are already on disk.
         // This pre-warms the ~200 MB model so the first agent step does not
         // pay the cold-start latency cost (~2–4 s on Exynos 9611).
@@ -824,11 +851,48 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                 tasksCompleted = it.tasksCompleted + 1,
                 totalSteps     = it.totalSteps + prevState.stepCount,
             )}
+            // Round 13: notify user when task finishes successfully.
+            postTaskNotification(
+                title = "ARIA — Task Complete",
+                body  = prevState.currentTask.take(80).ifBlank { "Task finished" }
+            )
         } else if (status == "error" && prevState.status == "running") {
             _sessionStats.update { it.copy(
                 tasksErrored = it.tasksErrored + 1,
                 totalSteps   = it.totalSteps + prevState.stepCount,
             )}
+            // Round 13: notify user on task failure.
+            val errDetail = data["lastError"] as? String ?: "unknown"
+            postTaskNotification(
+                title = "ARIA — Task Failed",
+                body  = "${prevState.currentTask.take(60).ifBlank { "Task" }} · $errDetail"
+            )
+        }
+    }
+
+    /**
+     * Round 13: post a system notification summarising the task outcome.
+     * Uses the existing "aria_agent_reasoning" foreground-service channel so no new
+     * channel is required.  Best-effort: silently no-ops if the channel is missing or
+     * notifications are disabled.
+     */
+    private fun postTaskNotification(title: String, body: String) {
+        runCatching {
+            val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            val openPi = PendingIntent.getActivity(
+                context, 0,
+                Intent(context, ComposeMainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            val notif = NotificationCompat.Builder(context, "aria_agent_reasoning")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setAutoCancel(true)
+                .setContentIntent(openPi)
+                .build()
+            nm.notify(TASK_NOTIF_ID, notif)
         }
     }
 
@@ -2206,6 +2270,7 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                         tps  = tps,
                     )
                 }
+                saveChatHistory()   // Round 13: persist after each successful exchange
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 _chatMessages.update { prev ->
                     prev + ChatMessageItem(
@@ -2231,6 +2296,63 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     fun clearChat() {
         _chatMessages.value = listOf(welcomeChatMsg)
         _chatThinking.value = false
+        saveChatHistory()
+    }
+
+    // ── Round 13: chat history persistence ───────────────────────────────────
+
+    /**
+     * Serialise the current chat message list (max [CHAT_HISTORY_MAX] non-system messages)
+     * to a JSON file in the app's private files directory.  Runs on IO — fire-and-forget.
+     */
+    private fun saveChatHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val msgs = _chatMessages.value
+                    .filter { it.id != "welcome" && it.role != "system" }
+                    .takeLast(CHAT_HISTORY_MAX)
+                val json = msgs.joinToString(",", "[", "]") { m ->
+                    val esc = m.text
+                        .replace("\\", "\\\\")
+                        .replace("\"", "\\\"")
+                        .replace("\n", "\\n")
+                        .replace("\r", "\\r")
+                        .replace("\t", "\\t")
+                    """{"id":"${m.id}","role":"${m.role}","text":"$esc","ts":${m.ts}}"""
+                }
+                File(context.filesDir, CHAT_HISTORY_FILE).writeText(json)
+            }
+        }
+    }
+
+    /**
+     * Load persisted chat messages from disk and prepend the welcome message.
+     * Silently no-ops if the file is absent or corrupted.
+     */
+    private fun loadChatHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val file = File(context.filesDir, CHAT_HISTORY_FILE)
+                if (!file.exists() || file.length() < 5L) return@runCatching
+                val json = file.readText().trim()
+                val regex = Regex(""""id":"([^"]+)","role":"([^"]+)","text":"((?:[^"\\]|\\.)*)","ts":(\d+)""")
+                val items = regex.findAll(json).map { m ->
+                    val (id, role, escapedText, ts) = m.destructured
+                    val text = escapedText
+                        .replace("\\n",  "\n")
+                        .replace("\\r",  "\r")
+                        .replace("\\t",  "\t")
+                        .replace("\\\"", "\"")
+                        .replace("\\\\", "\\")
+                    ChatMessageItem(id = id, role = role, text = text, ts = ts.toLong())
+                }.toList()
+                if (items.isNotEmpty()) {
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        _chatMessages.value = listOf(welcomeChatMsg) + items
+                    }
+                }
+            }
+        }
     }
 
     // ─── Migration Phase 6: Train ─────────────────────────────────────────────

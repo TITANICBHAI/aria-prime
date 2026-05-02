@@ -25,6 +25,7 @@ import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
 import com.ariaagent.mobile.ui.viewmodel.SessionStatsUiState
 import com.ariaagent.mobile.ui.viewmodel.SuggestionBannerItem
 import com.ariaagent.mobile.ui.theme.ARIAColors
+import com.ariaagent.mobile.core.system.NetworkMonitor
 
 /**
  * DashboardScreen — at-a-glance status panel.
@@ -54,6 +55,7 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
     val pendingSuggestions by vm.pendingSuggestions.collectAsStateWithLifecycle()
     val hwStats            by vm.hardwareStats.collectAsStateWithLifecycle()
     val sessionStats       by vm.sessionStats.collectAsStateWithLifecycle()
+    val networkType        by vm.networkType.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.refreshPendingSuggestions() }
 
@@ -197,6 +199,35 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
         // ── Hardware meters ───────────────────────────────────────────────────
         ARIACard {
             HardwareMeterRow(stats = hwStats)
+            Spacer(Modifier.height(8.dp))
+            // Round 13: network connectivity chip
+            val (netLabel, netColor) = when (networkType) {
+                "wifi"   -> "NET  WiFi"  to ARIAColors.Success
+                "mobile" -> "NET  Mobile" to ARIAColors.Warning
+                else     -> "OFFLINE"    to ARIAColors.Error
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(netColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        netLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color      = netColor,
+                            fontSize   = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
         }
 
         // ── Live token stream ─────────────────────────────────────────────────
