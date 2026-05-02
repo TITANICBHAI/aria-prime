@@ -32,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * AgentLoop — The central Observe → Reason → Act engine.
@@ -95,6 +96,10 @@ object AgentLoop {
     private const val MAX_STEPS_PER_SUBTASK = 30  // per-sub-task ceiling — prevents one task eating all budget
     private const val A11Y_RETRY_COUNT = 3        // retry attempts before declaring service dead
     private const val A11Y_RETRY_DELAY_MS = 2_000L
+    // Round 11: hard timeout on LLM inference so a JNI hang never blocks the loop forever.
+    // 90 s gives even a cold-loaded 4-bit Q4 model plenty of margin for 200-token generation
+    // on an Exynos 9611, while bounding worst-case hang damage to under two minutes total.
+    private const val LLM_INFERENCE_TIMEOUT_MS = 90_000L
     // FLAWS.md #5 — adaptive backoff for the in-loop "(not ready)" sentinel.
     // Starts at 250 ms so the first transient settles fast (most a11y-unready
     // states clear within one window animation frame), then doubles up to a
@@ -332,6 +337,12 @@ object AgentLoop {
                         }
                         Log.i("AgentLoop", "A11y service recovered after $a11yRetries retry/retries — continuing")
                     }
+
+                    // ── Round 11: step-level wall-clock timing ────────────────
+                    // Captured here (before observe) so stepDurationMs in the
+                    // action_performed event reflects the full observe→reason→act
+                    // pipeline latency, including LLM inference time.
+                    val stepStartMs = System.currentTimeMillis()
 
                     // ── 1. OBSERVE ────────────────────────────────────────────
                     val snapshot = ScreenObserver.capture()
@@ -634,20 +645,27 @@ object AgentLoop {
                     // the Exynos 9611 (no hardware bitmap pool on this SoC).
                     // The local `bmp` capture avoids forcing !! on snapshot.bitmap inside
                     // the lambda; all null checks are done before entering the try block.
+                    // ── Round 11: LLM inference with hard timeout ─────────────
+                    // withTimeoutOrNull cancels the coroutine's child job after
+                    // LLM_INFERENCE_TIMEOUT_MS and returns null — the `finally`
+                    // block below still executes so the bitmap is always recycled.
                     val bmp = snapshot.bitmap
-                    val rawOutput: String = try {
-                        if (unifiedVlmMode && bmp != null) {
-                            val imageBytes = VisionEngine.compressFramePublic(bmp)
-                            LlamaEngine.inferWithVision(imageBytes, prompt, maxTokens = 200) { token ->
-                                val tokData = mapOf("token" to token, "tokensPerSecond" to LlamaEngine.lastToksPerSec)
-                                onEvent?.invoke("token_generated", tokData)
-                                AgentEventBus.emit("token_generated", tokData)
-                            }
-                        } else {
-                            LlamaEngine.infer(prompt, maxTokens = 200) { token ->
-                                val tokData = mapOf("token" to token, "tokensPerSecond" to LlamaEngine.lastToksPerSec)
-                                onEvent?.invoke("token_generated", tokData)
-                                AgentEventBus.emit("token_generated", tokData)
+                    var rawOutputNullable: String? = null
+                    try {
+                        rawOutputNullable = withTimeoutOrNull(LLM_INFERENCE_TIMEOUT_MS) {
+                            if (unifiedVlmMode && bmp != null) {
+                                val imageBytes = VisionEngine.compressFramePublic(bmp)
+                                LlamaEngine.inferWithVision(imageBytes, prompt, maxTokens = 200) { token ->
+                                    val tokData = mapOf("token" to token, "tokensPerSecond" to LlamaEngine.lastToksPerSec)
+                                    onEvent?.invoke("token_generated", tokData)
+                                    AgentEventBus.emit("token_generated", tokData)
+                                }
+                            } else {
+                                LlamaEngine.infer(prompt, maxTokens = 200) { token ->
+                                    val tokData = mapOf("token" to token, "tokensPerSecond" to LlamaEngine.lastToksPerSec)
+                                    onEvent?.invoke("token_generated", tokData)
+                                    AgentEventBus.emit("token_generated", tokData)
+                                }
                             }
                         }
                     } finally {
@@ -656,6 +674,14 @@ object AgentLoop {
                         // previousSnapshot.bitmap being recycled here is safe.
                         bmp?.recycle()
                     }
+                    if (rawOutputNullable == null) {
+                        Log.e("AgentLoop", "LLM inference timed out after ${LLM_INFERENCE_TIMEOUT_MS / 1000}s — skipping step")
+                        ProgressPersistence.logNote(context, "LLM inference timeout — skipping step")
+                        AgentEventBus.emit("inference_timeout", mapOf("stepCount" to state.stepCount))
+                        delay(STEP_DELAY_MS)
+                        continue
+                    }
+                    val rawOutput: String = rawOutputNullable
 
                     // ── 4. PARSE ──────────────────────────────────────────────
                     val actionJson = PromptBuilder.parseAction(rawOutput)
@@ -914,13 +940,14 @@ object AgentLoop {
                     )
 
                     val actionData = mapOf(
-                        "tool"        to (extractTool(actionJson) ?: "unknown"),
-                        "nodeId"      to (extractNodeId(actionJson) ?: ""),
-                        "success"     to actionSuccess,
-                        "reward"      to reward,
-                        "stepCount"   to newStep,
-                        "appPackage"  to snapshot.appPackage,
-                        "timestamp"   to System.currentTimeMillis()
+                        "tool"            to (extractTool(actionJson) ?: "unknown"),
+                        "nodeId"          to (extractNodeId(actionJson) ?: ""),
+                        "success"         to actionSuccess,
+                        "reward"          to reward,
+                        "stepCount"       to newStep,
+                        "appPackage"      to snapshot.appPackage,
+                        "stepDurationMs"  to (System.currentTimeMillis() - stepStartMs),
+                        "timestamp"       to System.currentTimeMillis()
                     )
                     onEvent?.invoke("action_performed", actionData)
                     AgentEventBus.emit("action_performed", actionData)

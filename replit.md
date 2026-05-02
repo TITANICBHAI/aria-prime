@@ -56,6 +56,16 @@ server/              Python preview server for the Replit workspace
   7. **`LocalSnapshotStore` + `MonitoringPusher` battery/uptime** — `defaultStatus()` gains `batteryPercent: -1` and `uptimeSec: 0`. `buildStatus()` populates live battery + uptime. `/aria/status` endpoint now surfaces both.
   8. **Round 10 GAP_AUDIT update** — §33–40 added; header updated to Round 10.
   **Files changed:** `HardwareMonitor.kt`, `HardwareMeterBar.kt`, `SafetyScreen.kt`, `CrashHandler.kt`, `AgentForegroundService.kt`, `PolicyNetwork.kt`, `LocalSnapshotStore.kt`, `MonitoringPusher.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-02 — **Round 11 — closed 8 GAP_AUDIT items (§41–48):**
+  1. **`AgentEventBus` ring buffer** — `_history: ArrayDeque<Triple<…>>` (150 entries), thread-safe via `synchronized(historyLock)`. `recentEvents` returns immutable snapshot. `clearHistory()` for tests. `emit()` appends before broadcasting.
+  2. **`AgentLoop` LLM inference timeout** — `LLM_INFERENCE_TIMEOUT_MS = 90_000L`. `withTimeoutOrNull()` wraps `LlamaEngine.infer()` / `inferWithVision()` inside existing `try-finally` (bitmap still recycled). Null → log, emit `inference_timeout` event, `continue`. Prevents JNI hang blocking the loop forever.
+  3. **`AgentLoop` step duration telemetry** — `stepStartMs` captured before Observe phase. `"stepDurationMs"` added to `action_performed` payload (full observe→reason→act wall-clock latency).
+  4. **`AgentViewModel` periodic battery polling** — 60 s `while(true)` loop in `init` on IO dispatcher. Keeps battery chip live during idle/paused states.
+  5. **`AgentViewModel` `avgStepDurationMs` EMA** — `avgStepDurationMs: Long = 0L` in `SessionStatsUiState`. `handleActionPerformed` updates via α≈0.2 EMA from `stepDurationMs` event field.
+  6. **`ProgressPersistence.pruneOldLogs()`** — Trims `aria_progress.txt` lines with timestamps older than `daysToKeep=7`. Blank/separator lines (no timestamp) always kept. Called on cold-start from ViewModel init.
+  7. **`DiagnosticsScreen` crash file list** — New "CRASH REPORTS" section: `CrashHandler.listCrashes()` on IO dispatcher. One expandable card per file: name, size KB, relative time. "View/Collapse" toggle. Header turns red when any files exist.
+  8. **`DashboardScreen` avg step duration chip** — `SessionStatsCard` footer appends `• Xms/step` when `avgStepDurationMs > 0`.
+  **Files changed:** `AgentEventBus.kt`, `AgentLoop.kt`, `AgentViewModel.kt`, `SessionStatsUiState` (in AgentViewModel), `ProgressPersistence.kt`, `DiagnosticsScreen.kt`, `DashboardScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-02 — **Round 9 — closed/advanced 9 GAP_AUDIT items (new §25–32):**
   1. **Battery-aware LearningScheduler** — `maybeStartTraining()` reads `BatteryManager.BATTERY_PROPERTY_CAPACITY` and skips below 20%. Also skips when free RAM < 900 MB via `ActivityManager.MemoryInfo`. Both skips emit bus events. `getBatteryLevel()` + `getAvailableRamMb()` helpers added.
   2. **NSD/mDNS device discovery** — `LocalDeviceServer.startNsd(context)` registers `ARIA-Device._aria._tcp` via `NsdManager`. Called from `AgentViewModel.toggleLocalServer()`. Dashboards on the same LAN can auto-discover the device without manual IP entry.

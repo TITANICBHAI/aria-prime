@@ -261,6 +261,41 @@ object ProgressPersistence {
         Log.i(TAG, "Progress and goals cleared")
     }
 
+    /**
+     * Remove progress.txt lines older than [daysToKeep] days.
+     *
+     * Lines that match the `[YYYY-MM-DD ...]` timestamp prefix are tested against
+     * the cutoff. Lines with no parseable timestamp (e.g., blank lines or separator
+     * lines like `══ TASK START …`) are always kept so the log structure is preserved.
+     *
+     * Safe to call from any background coroutine — synchronized on the file.
+     */
+    fun pruneOldLogs(context: Context, daysToKeep: Int = 7) {
+        val file = File(context.filesDir, PROGRESS_FILE)
+        if (!file.exists()) return
+        synchronized(PROGRESS_FILE) {
+            runCatching {
+                val cutoffMs = System.currentTimeMillis() - daysToKeep * 86_400_000L
+                val lines    = file.readLines()
+                val kept     = lines.filter { line ->
+                    val tsMatch = Regex("""\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})]""").find(line)
+                    if (tsMatch != null) {
+                        val ts = runCatching {
+                            dateFmt.parse(tsMatch.groupValues[1])?.time ?: 0L
+                        }.getOrDefault(0L)
+                        ts >= cutoffMs
+                    } else {
+                        true  // no timestamp — always keep (headers, separators)
+                    }
+                }
+                if (kept.size < lines.size) {
+                    file.writeText(kept.joinToString("\n"))
+                    Log.i(TAG, "pruneOldLogs: removed ${lines.size - kept.size} lines older than $daysToKeep days")
+                }
+            }.onFailure { Log.e(TAG, "pruneOldLogs failed: ${it.message}") }
+        }
+    }
+
     // ─── Internal helpers ─────────────────────────────────────────────────────
 
     private fun writeGoalState(context: Context, state: GoalState) {

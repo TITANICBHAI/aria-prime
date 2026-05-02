@@ -326,6 +326,7 @@ data class SessionStatsUiState(
     val tasksErrored: Int    = 0,
     val totalSteps: Int      = 0,
     val sessionStartMs: Long = System.currentTimeMillis(),
+    val avgStepDurationMs: Long = 0L,   // Round 11: running avg of full observe→act latency
 ) {
     val successRate: Float
         get() = if (tasksCompleted + tasksErrored == 0) 0f
@@ -707,6 +708,21 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         refreshPendingSuggestions()
         loadTriggers()
 
+        // Round 11: periodic battery polling — keeps the dashboard battery chip live
+        // even when no agent events are arriving (e.g., idle or paused state).
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                kotlinx.coroutines.delay(60_000L)
+                refreshBatteryLevel()
+            }
+        }
+
+        // Round 11: prune progress log lines older than 7 days on every cold start
+        // so aria_progress.txt doesn't grow unboundedly on long-running installs.
+        viewModelScope.launch(Dispatchers.IO) {
+            com.ariaagent.mobile.core.persistence.ProgressPersistence.pruneOldLogs(context, daysToKeep = 7)
+        }
+
         // Auto-load vision model on startup if files are already on disk.
         // This pre-warms the ~200 MB model so the first agent step does not
         // pay the cold-start latency cost (~2–4 s on Exynos 9611).
@@ -827,6 +843,19 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         )
         _actionLogs.update { prev -> listOf(entry) + prev.take(199) }
         _streamBuffer.value = ""
+
+        // Round 11: update running average step duration from the stepDurationMs field
+        // emitted by AgentLoop. Uses an exponential moving average (α=0.2) to smooth
+        // noisy individual measurements while converging quickly after model loads.
+        val durationMs = (data["stepDurationMs"] as? Long) ?: 0L
+        if (durationMs > 0L) {
+            _sessionStats.update { prev ->
+                val current = prev.avgStepDurationMs
+                val updated = if (current == 0L) durationMs
+                              else ((current * 4L + durationMs) / 5L)  // α≈0.2 EMA
+                prev.copy(avgStepDurationMs = updated)
+            }
+        }
     }
 
     private fun handleTokenGenerated(data: Map<String, Any>) {

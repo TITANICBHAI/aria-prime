@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ariaagent.mobile.core.logging.CrashHandler
 import com.ariaagent.mobile.ui.theme.ARIAColors
 import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
 import com.ariaagent.mobile.ui.viewmodel.OrchestrationComponentUi
@@ -295,6 +296,91 @@ fun DiagnosticsScreen(
                                     lineHeight = 14.sp
                                 )
                             )
+                        }
+                    }
+                }
+            }
+
+            // ── Crash file list ──────────────────────────────────────────────
+            // Round 11: lists every .txt crash report written by CrashHandler,
+            // one expandable card per file, so engineers can read the full stack
+            // trace without leaving the app or pulling logcat.
+            var crashFiles by remember { mutableStateOf<List<File>>(emptyList()) }
+            var expandedCrashFile by remember { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(Unit) {
+                crashFiles = withContext(Dispatchers.IO) { CrashHandler.listCrashes() }
+            }
+
+            Text(
+                "CRASH REPORTS (${crashFiles.size})",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = if (crashFiles.isEmpty()) ARIAColors.Muted else ARIAColors.Error,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            )
+            if (crashFiles.isEmpty()) {
+                ARIACard {
+                    Text(
+                        "No crash reports on disk.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                    )
+                }
+            } else {
+                crashFiles.sortedByDescending { it.lastModified() }.forEach { file ->
+                    val isExpanded = expandedCrashFile == file.name
+                    ARIACard(containerColor = if (isExpanded) ARIAColors.Surface else ARIAColors.Background) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    file.name,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = ARIAColors.Error, fontWeight = FontWeight.SemiBold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                )
+                                Text(
+                                    "${String.format("%.1f", file.length() / 1024.0)} KB  •  " +
+                                    relativeTime(file.lastModified()),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
+                                )
+                            }
+                            TextButton(
+                                onClick = { expandedCrashFile = if (isExpanded) null else file.name },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    if (isExpanded) "Collapse" else "View",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Primary)
+                                )
+                            }
+                        }
+                        if (isExpanded) {
+                            Spacer(Modifier.height(6.dp))
+                            val content = remember(file.name) {
+                                runCatching { file.readText() }.getOrDefault("(unreadable)")
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(ARIAColors.Background, RoundedCornerShape(6.dp))
+                                    .padding(8.dp)
+                            ) {
+                                Text(
+                                    content,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color      = ARIAColors.OnSurface,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize   = 9.sp,
+                                        lineHeight = 13.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }

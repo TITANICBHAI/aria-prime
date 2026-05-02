@@ -4,6 +4,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.util.Collections
 
 /**
  * AgentEventBus — the internal event backbone for ARIA's Kotlin brain.
@@ -55,11 +56,38 @@ object AgentEventBus {
     /** Subscribe to all agent events as a SharedFlow. */
     val flow: SharedFlow<Pair<String, Map<String, Any>>> = _flow.asSharedFlow()
 
+    // ── In-memory ring buffer ──────────────────────────────────────────────────
+    // Keeps the last HISTORY_SIZE events so late subscribers (UI screens that
+    // navigate in after events were emitted) can display recent activity without
+    // needing a replay-capable SharedFlow (which would deliver stale data to all
+    // subscribers). Thread-safe via a synchronised wrapper.
+    private const val HISTORY_SIZE = 150
+    private val _history: ArrayDeque<Triple<String, Map<String, Any>, Long>> =
+        ArrayDeque(HISTORY_SIZE + 1)
+    private val historyLock = Any()
+
+    /**
+     * Snapshot of the last ≤[HISTORY_SIZE] emitted events as an immutable list,
+     * ordered oldest → newest. Each entry is (name, data, timestampMs).
+     * Returns a copy — safe to iterate from any thread.
+     */
+    val recentEvents: List<Triple<String, Map<String, Any>, Long>>
+        get() = synchronized(historyLock) { _history.toList() }
+
     /**
      * Emit an event. Non-suspending, safe to call from any thread.
+     * Also appends to the in-memory ring buffer for late subscribers.
      * Returns false only if the buffer is full and DROP_OLDEST didn't make space
      * (practically never happens with a 128-element buffer).
      */
-    fun emit(name: String, data: Map<String, Any> = emptyMap()): Boolean =
-        _flow.tryEmit(name to data)
+    fun emit(name: String, data: Map<String, Any> = emptyMap()): Boolean {
+        synchronized(historyLock) {
+            _history.addLast(Triple(name, data, System.currentTimeMillis()))
+            while (_history.size > HISTORY_SIZE) _history.removeFirst()
+        }
+        return _flow.tryEmit(name to data)
+    }
+
+    /** Clear the ring buffer (useful for tests). */
+    fun clearHistory() = synchronized(historyLock) { _history.clear() }
 }

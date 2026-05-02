@@ -365,9 +365,13 @@ private fun SessionStatsCard(stats: SessionStatsUiState) {
         }
         if (stats.tasksCompleted > 0) {
             Spacer(Modifier.height(6.dp))
+            val avgDurText = if (stats.avgStepDurationMs > 0L) {
+                "  •  ${stats.avgStepDurationMs}ms/step"
+            } else ""
             Text(
-                "Avg ${String.format("%.1f", stats.avgStepsPerTask)} steps/task  •  " +
-                "Session ${stats.sessionDurationMinutes} min",
+                "Avg ${String.format("%.1f", stats.avgStepsPerTask)} steps/task" +
+                avgDurText +
+                "  •  Session ${stats.sessionDurationMinutes} min",
                 style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
             )
         }
