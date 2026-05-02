@@ -16,8 +16,11 @@ fi
 git commit -m "$COMMIT_MESSAGE"
 
 GITHUB_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN:-${GITHUB_TOKEN:-}}"
+REMOTE_URL="$(git remote get-url origin)"
+
 if [ -n "$GITHUB_TOKEN" ]; then
-  git -c "http.extraheader=Authorization: Bearer ${GITHUB_TOKEN}" push origin main
+  AUTHED_URL="$(echo "$REMOTE_URL" | sed "s|https://|https://x-access-token:${GITHUB_TOKEN}@|")"
+  git push "$AUTHED_URL" HEAD:main
 else
   git push origin main
 fi
