@@ -971,6 +971,50 @@ fun SettingsScreen(
             }
         }
 
+        // Round 14 §78: Export config as shareable JSON text.
+        OutlinedButton(
+            onClick = {
+                val cfg = config
+                val json = buildString {
+                    appendLine("{")
+                    appendLine("  \"model_path\": \"${cfg.modelPath}\",")
+                    appendLine("  \"quantization\": \"${cfg.quantization}\",")
+                    appendLine("  \"context_window\": ${cfg.contextWindow},")
+                    appendLine("  \"max_tokens_per_turn\": ${cfg.maxTokensPerTurn},")
+                    appendLine("  \"temperature\": ${cfg.temperatureX100 / 100.0},")
+                    appendLine("  \"gpu_layers\": ${cfg.nGpuLayers},")
+                    appendLine("  \"gpu_backend\": \"${cfg.gpuBackend}\",")
+                    appendLine("  \"flash_attn\": ${cfg.flashAttn},")
+                    appendLine("  \"kv_cache_quantization\": \"${cfg.kvCacheQuantization}\",")
+                    appendLine("  \"gpu_ubatch\": ${cfg.gpuUbatch},")
+                    appendLine("  \"memory_mapping\": ${cfg.memoryMapping},")
+                    appendLine("  \"rl_enabled\": ${cfg.rlEnabled},")
+                    appendLine("  \"lora_adapter_path\": \"${cfg.loraAdapterPath}\"")
+                    append("}")
+                }
+                context.startActivity(
+                    Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, json)
+                            putExtra(Intent.EXTRA_SUBJECT, "ARIA Configuration Export")
+                        },
+                        "Export ARIA Config"
+                    )
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape  = RoundedCornerShape(12.dp),
+            colors = OutlinedButtonDefaults.colors(contentColor = ARIAColors.Primary),
+            border = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Primary.copy(alpha = 0.45f))
+        ) {
+            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("EXPORT CONFIGURATION", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+
         // ── Danger Zone (new — beyond RN) ─────────────────────────────────────
         SectionLabel("Danger Zone")
 

@@ -509,6 +509,11 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     private val _networkType = MutableStateFlow("none")
     val networkType: StateFlow<String> = _networkType.asStateFlow()
 
+    // Round 14 §75: elapsed-seconds counter while agent is running — drives Dashboard uptime chip.
+    private var uptimeJob: Job? = null
+    private val _uptimeSeconds = MutableStateFlow(0L)
+    val uptimeSeconds: StateFlow<Long> = _uptimeSeconds.asStateFlow()
+
     // ── Migration Phase 5: Chat ───────────────────────────────────────────────
 
     private val welcomeChatMsg = ChatMessageItem(
@@ -829,6 +834,20 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             _streamBuffer.value = ""
             _stepState.value = StepUiState()
             stopFloatingChat()
+        }
+        // Round 14 §75: start / stop uptime timer as the agent transitions in/out of "running".
+        if (status == "running" && prevState.status != "running") {
+            _uptimeSeconds.value = 0L
+            uptimeJob?.cancel()
+            uptimeJob = viewModelScope.launch {
+                while (true) {
+                    delay(1_000L)
+                    _uptimeSeconds.update { it + 1 }
+                }
+            }
+        } else if (status != "running") {
+            uptimeJob?.cancel()
+            uptimeJob = null
         }
         // Round 7: record completed goals for the Templates tab "Recently Completed" section.
         // Only push when a real task just finished (was running → now idle/done).

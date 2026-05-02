@@ -107,6 +107,8 @@ object AgentLoop {
     private const val A11Y_SENTINEL_BACKOFF_INITIAL_MS = 250L
     private const val A11Y_SENTINEL_BACKOFF_MAX_MS     = 2_000L
     private const val STEP_DELAY_MS = 800L
+    /** Round 14 §70: halved step delay when agent has ≥3 consecutive successes — rewards momentum. */
+    private const val STEP_DELAY_FAST_MS = 400L
     private const val DEAD_NODE_THRESHOLD = 3  // consecutive gesture failures before injecting dead-node hint
     private const val SCREEN_SETTLE_MS = 600L
     private const val WAIT_RETRY_DELAY_MS = 1200L
@@ -204,6 +206,8 @@ object AgentLoop {
             // Round 12: track consecutive inference timeouts so MAX_CONSECUTIVE_TIMEOUTS
             // can abort the task rather than looping forever on a wedged model.
             var consecutiveTimeouts = 0
+            // Round 14 §70: track consecutive action successes — used for adaptive step delay.
+            var consecutiveSuccesses = 0
             // Round 13: cache the last non-blank vision description so we can reuse it
             // when the screen hash hasn't changed (skipping a ~400 ms SmolVLM call).
             var lastVisionDescription = ""
@@ -339,7 +343,8 @@ object AgentLoop {
                         if (!AgentAccessibilityService.isActive) {
                             Log.e("AgentLoop",
                                 "Accessibility Service still dead after $A11Y_RETRY_COUNT retries — aborting")
-                            state = state.copy(status = Status.DONE, lastError = "accessibility_service_dead")
+                            // Round 14 §71: A11y service failure is an ERROR, not DONE (DONE falsely implies success).
+                            state = state.copy(status = Status.ERROR, lastError = "accessibility_service_dead")
                             ProgressPersistence.logNote(context, "Aborted: accessibility service not active after retries")
                             ProgressPersistence.logTaskEnd(context, goal, succeeded = false)
                             SustainedPerformanceManager.disable()
@@ -940,6 +945,8 @@ object AgentLoop {
                     } else 0.0
                     val reward = baseReward + labelBoost
                     val result = if (actionSuccess) "success" else "failure"
+                    // Round 14 §70: adaptive step delay — track consecutive successes.
+                    if (actionSuccess) consecutiveSuccesses++ else consecutiveSuccesses = 0
 
                     // ── 7. STORE — persist experience ────────────────────────
                     store.save(ExperienceStore.ExperienceTuple(
@@ -1022,7 +1029,8 @@ object AgentLoop {
                     AgentEventBus.emit("action_performed", actionData)
                     emitStatus()
 
-                    delay(STEP_DELAY_MS)
+                    // Round 14 §70: use the faster delay after 3+ consecutive successes.
+                    delay(if (consecutiveSuccesses >= 3) STEP_DELAY_FAST_MS else STEP_DELAY_MS)
                 }
 
                 if (state.stepCount >= MAX_STEPS) {
@@ -1037,8 +1045,12 @@ object AgentLoop {
                 }
 
             } catch (e: Exception) {
-                state = state.copy(status = Status.ERROR, lastError = e.message ?: "unknown error")
-                ProgressPersistence.logNote(context, "EXCEPTION: ${e.message ?: "unknown error"}")
+                // Round 14 §80: propagate coroutine cancellation — swallowing it breaks cooperative cancellation.
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Round 14 §72: include exception class name for better diagnostics in the error field.
+                val errDetail = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}"
+                state = state.copy(status = Status.ERROR, lastError = errDetail)
+                ProgressPersistence.logNote(context, "EXCEPTION: $errDetail")
                 ProgressPersistence.logTaskEnd(context, goal, succeeded = false)
                 SustainedPerformanceManager.disable()
                 emitStatus()

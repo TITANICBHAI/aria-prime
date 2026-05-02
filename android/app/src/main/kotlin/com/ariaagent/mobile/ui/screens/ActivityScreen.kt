@@ -508,6 +508,11 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
             message = "The agent will store learned patterns here"
         )
     } else {
+        // Round 14 §79: derive avg confidence once, cached until entries list changes.
+        val avgConf = remember(entries) {
+            if (entries.isEmpty()) 0
+            else ((entries.sumOf { it.reward.coerceIn(0.0, 1.0) } / entries.size) * 100).toInt()
+        }
         LazyColumn(
             modifier        = Modifier.fillMaxSize(),
             contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -533,6 +538,7 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                             MemStatChip("Fail",     "${stats.failure}",  ARIAColors.Destructive)
                             MemStatChip("Edge",     "${stats.edgeCase}", ARIAColors.Warning)
                             MemStatChip("Untrained","${stats.untrained}",ARIAColors.Muted)
+                            MemStatChip("Avg Conf", "$avgConf%",         ARIAColors.Primary)
                         }
                     }
                 }

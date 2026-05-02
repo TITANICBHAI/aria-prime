@@ -56,6 +56,7 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
     val hwStats            by vm.hardwareStats.collectAsStateWithLifecycle()
     val sessionStats       by vm.sessionStats.collectAsStateWithLifecycle()
     val networkType        by vm.networkType.collectAsStateWithLifecycle()
+    val uptimeSeconds      by vm.uptimeSeconds.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.refreshPendingSuggestions() }
 
@@ -187,6 +188,12 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     MetricChip(Icons.Default.Speed, "${String.format("%.1f", agentState.tokenRate)} t/s")
                     MetricChip(Icons.Default.Loop, "Step ${agentState.stepCount}")
+                    // Round 14 §76: live task uptime while running.
+                    if (agentState.status == "running") {
+                        val m = uptimeSeconds / 60
+                        val s = uptimeSeconds % 60
+                        MetricChip(Icons.Default.Timer, "$m:${"%02d".format(s)}")
+                    }
                 }
             }
 

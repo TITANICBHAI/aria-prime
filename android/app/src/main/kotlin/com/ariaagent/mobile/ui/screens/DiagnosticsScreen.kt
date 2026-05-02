@@ -2,7 +2,9 @@
 
 package com.ariaagent.mobile.ui.screens
 
+import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -144,6 +146,31 @@ fun DiagnosticsScreen(
                         )
                     )
                 }
+            }
+
+            // ── Round 14 §77: Device / system info card ────────────────────
+            ARIACard {
+                val sysCtx = LocalContext.current
+                val memInfo = remember {
+                    ActivityManager.MemoryInfo().also { mi ->
+                        (sysCtx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
+                            .getMemoryInfo(mi)
+                    }
+                }
+                Text(
+                    "DEVICE INFO",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Muted, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
+                DiagInfoRow("Model",     "${Build.MANUFACTURER} ${Build.MODEL}")
+                DiagInfoRow("Android",   "${Build.VERSION.RELEASE}  (API ${Build.VERSION.SDK_INT})")
+                DiagInfoRow("ABI",       Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+                DiagInfoRow("Total RAM", "${memInfo.totalMem / (1024 * 1024)} MB")
+                DiagInfoRow("Avail RAM", "${memInfo.availMem  / (1024 * 1024)} MB  " +
+                    "(${(memInfo.availMem * 100 / memInfo.totalMem.coerceAtLeast(1)).toInt()}% free)")
+                DiagInfoRow("Low RAM",   if (memInfo.lowMemory) "YES ⚠" else "No")
             }
 
             // ── Orchestrator header ─────────────────────────────────────────
@@ -590,6 +617,29 @@ private fun EventRow(evt: OrchestrationEventUi) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DiagInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = ARIAColors.OnSurface,
+                fontFamily = FontFamily.Monospace,
+            )
+        )
+    }
+}
 
 private val clockFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
 private fun formatClock(ts: Long): String = clockFmt.format(Date(ts))

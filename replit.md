@@ -121,6 +121,19 @@ server/              Python preview server for the Replit workspace
   6. **`ModulesScreen.kt` "placeholder" claim (§5)** — Stale GAP_AUDIT claim debunked: App Skills, Vision, and SAM2 sections all read real `ModuleUiState` fields and have working download/load/unload controls. Closed as already done.
   7. **`InferenceEngineImpl.kt` ghost entry (§2)** — File does not exist. Closed as N/A.
   **Files changed:** `PolicyNetwork.kt`, `AgentViewModel.kt`, `GoalsScreen.kt`, `ChatScreen.kt`, `ActivityScreen.kt`, `GAP_AUDIT.md`.
+- 2026-05-02 — **Round 14 — closed GAP_AUDIT §70–§80 (11 items):**
+  1. **`AgentLoop` adaptive step delay (§70)** — `STEP_DELAY_FAST_MS = 400L`; `consecutiveSuccesses` counter; end-of-loop delay halved to 400 ms after 3+ consecutive successes, resets to 800 ms on any failure.
+  2. **`AgentLoop` A11y abort DONE→ERROR (§71)** — `accessibility_service_dead` abort path correctly sets `Status.ERROR` (was `Status.DONE`).
+  3. **`AgentLoop` exception class name in error (§72)** — `"${e.javaClass.simpleName}: ${e.message}"` stored in `lastError`; same passed to `ProgressPersistence.logNote`.
+  4. **`ControlScreen` recent-goals chips (§73)** — Horizontal chip row using `vm.recentGoals` StateFlow; one-tap populates goal + package fields.
+  5. **`ControlScreen` package auto-suggest chips (§74)** — 12-entry `PACKAGE_SUGGESTIONS` map; `remember(goalText)` derivation; `SuggestionChip` row auto-fills target-app field.
+  6. **`AgentViewModel` uptime timer (§75)** — `_uptimeSeconds` StateFlow + `uptimeJob`; starts/resets on running, cancels on any other status.
+  7. **`DashboardScreen` uptime chip (§76)** — `MetricChip(Timer, "M:SS")` shown while running.
+  8. **`DiagnosticsScreen` device info card (§77)** — `ActivityManager.MemoryInfo` + `Build` fields; 6-row card: Model, Android, ABI, Total/Avail RAM, Low RAM flag; `DiagInfoRow` composable.
+  9. **`SettingsScreen` export config button (§78)** — `OutlinedButton` shares 13-field JSON via `Intent.ACTION_SEND`.
+  10. **`ActivityScreen` avg-confidence chip (§79)** — `remember(entries)` avg-reward derivation; `MemStatChip("Avg Conf", "$avgConf%")` added as 6th chip.
+  11. **`AgentLoop` CancellationException rethrow (§80)** — `catch (e: Exception)` rethrows `CancellationException` to preserve structured-concurrency cancellation.
+  **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `ControlScreen.kt`, `SettingsScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-02 — **Round 6 — closed four open GAP_AUDIT items:**
   1. **Screen hash jitter (§4)** — `ScreenSnapshot.screenHashFuzzy()` added to `ScreenObserver.kt`. Strips `\b\d+(?:[,.]\d+)*\b` digit sequences before SHA-256. `AgentLoop` now tracks `lastScreenHashFuzzy` and uses it for stuck-detection comparisons at every step; the exact `screenHash()` is kept for all DB keying (ObjectLabelStore, VisionEmbeddingStore, SessionReplayStore). Counter increments, badge counts, "X min ago" labels no longer reset `stuckCount`.
   2. **Task queue ceiling (§4)** — `TaskQueueManager.MAX_QUEUE_SIZE = 20`; `enqueue()` returns `QueuedTask?` (null when full). `AgentViewModel.enqueueTask()` logs the rejection. `ControlScreen` disables the Add-to-Queue button and renders "(N/20 — FULL)" in red when at capacity.

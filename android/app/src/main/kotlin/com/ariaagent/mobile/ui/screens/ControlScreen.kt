@@ -34,6 +34,7 @@ import com.ariaagent.mobile.core.ai.ModelManager
 import com.ariaagent.mobile.ui.viewmodel.AgentViewModel
 import com.ariaagent.mobile.ui.viewmodel.ChainedTaskItem
 import com.ariaagent.mobile.ui.viewmodel.QueuedTaskItem
+import com.ariaagent.mobile.ui.viewmodel.RecentGoalItem
 import com.ariaagent.mobile.ui.theme.ARIAColors
 import java.text.SimpleDateFormat
 import java.util.*
@@ -53,6 +54,22 @@ import java.util.*
  * Pure Compose — calls AgentViewModel which calls AgentLoop / AgentForegroundService directly.
  * No bridge, no React Native, no JS.
  */
+
+/** Round 14 §74: keyword → package suggestions surfaced below the target-app field. */
+private val PACKAGE_SUGGESTIONS = listOf(
+    "youtube"     to "com.google.android.youtube",
+    "chrome"      to "com.android.chrome",
+    "settings"    to "com.android.settings",
+    "maps"        to "com.google.android.apps.maps",
+    "gmail"       to "com.google.android.gm",
+    "whatsapp"    to "com.whatsapp",
+    "instagram"   to "com.instagram.android",
+    "calculator"  to "com.android.calculator2",
+    "camera"      to "com.android.camera2",
+    "gallery"     to "com.google.android.apps.photos",
+    "spotify"     to "com.spotify.music",
+    "twitter"     to "com.twitter.android",
+)
 
 private val PRESET_TASKS = listOf(
     "Open YouTube and play the trending video",
@@ -78,6 +95,7 @@ fun ControlScreen(
     val taskQueue    by vm.taskQueue.collectAsStateWithLifecycle()
     val chainedTask  by vm.chainedTask.collectAsStateWithLifecycle()
     val loadedLlms   by vm.loadedLlms.collectAsStateWithLifecycle()
+    val recentGoals  by vm.recentGoals.collectAsStateWithLifecycle()
     val hwStats      by vm.hardwareStats.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val activeModel  = remember { ModelManager.activeEntry(context) }
@@ -98,6 +116,14 @@ fun ControlScreen(
             && moduleState.modelLoaded
             && moduleState.accessibilityGranted
     val queueAtCapacity = taskQueue.size >= 20  // TaskQueueManager.MAX_QUEUE_SIZE
+
+    // Round 14 §74: packages that match keywords found in the typed goal text.
+    val packageSuggests = remember(goalText) {
+        if (goalText.length < 3) emptyList()
+        else PACKAGE_SUGGESTIONS.filter { (keyword, _) ->
+            goalText.contains(keyword, ignoreCase = true)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -411,6 +437,47 @@ fun ControlScreen(
                 maxLines = 3,
                 enabled = isIdle
             )
+            // Round 14 §73: recently-completed goals as one-tap chips.
+            if (recentGoals.isNotEmpty() && isIdle) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "RECENT GOALS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Muted, fontSize = 9.sp
+                    )
+                )
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(end = 8.dp)
+                ) {
+                    androidx.compose.foundation.lazy.items(recentGoals.take(5)) { item ->
+                        androidx.compose.material3.AssistChip(
+                            onClick = {
+                                goalText  = item.goal
+                                if (item.appPackage.isNotBlank()) targetApp = item.appPackage
+                            },
+                            label = {
+                                Text(
+                                    item.goal.take(40),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = ARIAColors.OnSurface, fontSize = 10.sp
+                                    ),
+                                    maxLines = 1,
+                                )
+                            },
+                            colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                                containerColor = ARIAColors.Surface,
+                                labelColor     = ARIAColors.OnSurface,
+                            ),
+                            border = androidx.compose.material3.AssistChipDefaults.assistChipBorder(
+                                enabled = true,
+                                borderColor = ARIAColors.Divider
+                            )
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = targetApp,
@@ -434,6 +501,37 @@ fun ControlScreen(
                 maxLines = 1,
                 enabled = isIdle
             )
+            // Round 14 §74: package auto-suggest chips driven by goal text keywords.
+            if (packageSuggests.isNotEmpty() && targetApp.isBlank() && isIdle) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "SUGGESTED PACKAGE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = ARIAColors.Muted, fontSize = 9.sp
+                    )
+                )
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    androidx.compose.foundation.lazy.items(packageSuggests) { (_, pkg) ->
+                        androidx.compose.material3.SuggestionChip(
+                            onClick = { targetApp = pkg },
+                            label = {
+                                Text(
+                                    pkg,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = ARIAColors.Primary,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize   = 10.sp,
+                                    ),
+                                    maxLines = 1
+                                )
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         // ── Preset task chips ─────────────────────────────────────────────────
