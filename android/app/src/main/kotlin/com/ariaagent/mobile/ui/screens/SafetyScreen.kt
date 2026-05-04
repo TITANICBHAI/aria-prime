@@ -483,6 +483,15 @@ private fun AllowlistSection(
             }
 
             if (allowlistMode) {
+                // Round 25 §210: "N apps allowed" count chip above the add row.
+                if (packages.isNotEmpty()) {
+                    Text(
+                        "${packages.size} app${if (packages.size == 1) "" else "s"} allowed",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Success, fontWeight = FontWeight.SemiBold, fontSize = 10.sp
+                        )
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -512,10 +521,30 @@ private fun AllowlistSection(
                         Icon(Icons.Default.AddCircle, contentDescription = "Allow", tint = ARIAColors.Success)
                     }
                 }
+                // Round 25 §203: search/filter for allowed packages.
+                var allowSearch by remember { mutableStateOf("") }
+                if (packages.isNotEmpty()) {
+                    OutlinedTextField(
+                        value         = allowSearch,
+                        onValueChange = { allowSearch = it },
+                        modifier      = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        placeholder   = { Text("Filter allowed apps…", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)) },
+                        leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(16.dp)) },
+                        trailingIcon  = if (allowSearch.isNotBlank()) {{ IconButton(onClick = { allowSearch = "" }) { Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) }}} else null,
+                        singleLine    = true,
+                        shape         = RoundedCornerShape(8.dp),
+                        colors        = safetyFieldColors(),
+                    )
+                }
+                val filteredAllowed = remember(packages, allowSearch) {
+                    packages.sorted().filter { allowSearch.isBlank() || it.contains(allowSearch, ignoreCase = true) }
+                }
                 if (packages.isEmpty()) {
                     SafetyInfoRow(Icons.Default.Warning, "Allowlist is empty — ARIA is currently fully blocked in allowlist mode.", ARIAColors.Warning)
+                } else if (filteredAllowed.isEmpty()) {
+                    SafetyInfoRow(Icons.Default.SearchOff, "No allowed apps match \"$allowSearch\"", ARIAColors.Muted)
                 } else {
-                    packages.sorted().forEach { pkg ->
+                    filteredAllowed.forEach { pkg ->
                         PackageRow(pkg = pkg, color = ARIAColors.Success, onRemove = { onRemove(pkg) })
                     }
                 }

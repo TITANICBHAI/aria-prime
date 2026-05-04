@@ -597,6 +597,23 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
             if (entries.isEmpty()) 0
             else ((entries.sumOf { it.reward.coerceIn(0.0, 1.0) } / entries.size) * 100).toInt()
         }
+        // Round 25 §201: memory stats header chip row — entry count, avg reward, edge-case count.
+        val avgReward    = remember(entries) { if (entries.isEmpty()) 0.0 else entries.sumOf { it.reward } / entries.size }
+        val edgeCaseCountHdr = remember(entries) { entries.count { it.isEdgeCase } }
+        Row(
+            modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Text("${entries.size} entries", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+            Text("·", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Divider))
+            val rewardColor = if (avgReward >= 0.5) ARIAColors.Success else ARIAColors.Warning
+            Text("avg reward %.2f".format(avgReward), style = MaterialTheme.typography.labelSmall.copy(color = rewardColor, fontWeight = FontWeight.SemiBold, fontSize = 10.sp))
+            if (edgeCaseCountHdr > 0) {
+                Text("·", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Divider))
+                Text("$edgeCaseCountHdr edge", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Warning, fontSize = 10.sp))
+            }
+        }
         // Round 16 §99: edge-case filter chip.
         var showEdgeCasesOnly by remember { mutableStateOf(false) }
         // Round 17 §109: memory search bar — filter entries by app package or summary text.
@@ -651,6 +668,27 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                             selectedLabelColor     = ARIAColors.Success,
                         ),
                     )
+                    // Round 25 §205: export memory entries as plain-text share.
+                    val exportCtx = LocalContext.current
+                    if (displayEntries.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                val csv = displayEntries.joinToString("\n") { e ->
+                                    "${e.app},${e.taskType},${e.summary.take(60)},${e.reward}"
+                                }
+                                exportCtx.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "app,taskType,summary,reward\n$csv")
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }.let { android.content.Intent.createChooser(it, "Export memory") }
+                                )
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Share, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp))
+                        }
+                    }
                 }
             }
             // Round 17 §109: memory search bar — filter by app package or summary.
@@ -1127,6 +1165,7 @@ private fun SessionReplayCard(
             .background(ARIAColors.Surface)
     ) {
         // ── Session header row ──────────────────────────────────────────────────
+        val sessionShareCtx = LocalContext.current
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1172,6 +1211,24 @@ private fun SessionReplayCard(
                             color = ARIAColors.Primary, fontWeight = FontWeight.Bold
                         )
                     )
+                    // Round 25 §206: share button for this session.
+                    IconButton(
+                        onClick = {
+                            val text = "ARIA Session: ${session.goal.take(80)}\n" +
+                                "Time: $timeStr · ${session.stepCount} steps\n" +
+                                "Success: ${session.succeeded}, Failed: ${session.failed}"
+                            sessionShareCtx.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, text)
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }.let { android.content.Intent.createChooser(it, "Share session") }
+                            )
+                        },
+                        modifier = Modifier.size(22.dp),
+                    ) {
+                        Icon(Icons.Default.Share, null, tint = ARIAColors.Muted, modifier = Modifier.size(13.dp))
+                    }
                     if (session.succeeded > 0) {
                         Text(
                             "✓${session.succeeded}",

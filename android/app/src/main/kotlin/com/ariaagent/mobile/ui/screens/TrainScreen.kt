@@ -277,6 +277,13 @@ private fun RlStatusCard(
                 accent = status?.policyReady == true,
                 modifier = Modifier.weight(1f),
             )
+            // Round 25 §204: default batch size chip (fixed 32 in ARIA's RL implementation).
+            StatBadge(
+                label    = "Batch",
+                value    = "32",
+                accent   = false,
+                modifier = Modifier.weight(1f),
+            )
         }
 
         // Round 20 §151: "N training steps" summary below the StatBadge row.

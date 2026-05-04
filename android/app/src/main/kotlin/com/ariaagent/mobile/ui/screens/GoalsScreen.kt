@@ -694,6 +694,19 @@ private fun TemplatesTab(
             )
         }
 
+        // Round 25 §209: empty state when both recent goals and templates are empty with no search.
+        if (searchQuery.isBlank() && filteredRecentGoals.isEmpty() && filteredTemplates.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.BookmarkBorder, null, tint = ARIAColors.Muted, modifier = Modifier.size(40.dp))
+                    Text("No templates yet", style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface))
+                    Text("Run a task from Control — it will appear here", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted), textAlign = TextAlign.Center)
+                }
+            }
+        }
         // Round 21 §158: empty state when search query yields no results in either list.
         if (searchQuery.isNotBlank() && filteredTemplates.isEmpty() && filteredRecentGoals.isEmpty()) {
             Box(

@@ -161,6 +161,17 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 25 — closed GAP_AUDIT §201–§212 (12 items):**
+  1. **`ActivityScreen` MemoryList stats header row (§201)** — `avgReward` + `edgeCaseCountHdr`; `"N entries · avg reward X.XX · M edge"` Row above filter chips.
+  2. **`ModulesScreen` AppSkillRow expand/collapse for package name (§202)** — `var expanded`; `Column(clickable)` wraps Row; `Row(Apps icon + appPackage monospace)` revealed on tap.
+  3. **`SafetyScreen` AllowlistSection search/filter TextField (§203)** — `var allowSearch`; `OutlinedTextField("Filter allowed apps…")` when packages non-empty; filtered list + empty-search state.
+  4. **`TrainScreen` RlStatusCard "Batch: 32" StatBadge (§204)** — Fourth `StatBadge("Batch", "32")` appended to stat Row in `RlStatusCard`.
+  5. **`ActivityScreen` MemoryList "Export memory" share button (§205)** — `IconButton(Share)` in filter-chip Row when `displayEntries.isNotEmpty()`; CSV export via `ACTION_SEND`.
+  6. **`ActivityScreen` SessionReplayCard "Share session" icon button (§206)** — `IconButton(Share, 22dp)` after "steps" Text; shares goal + time + steps + success/fail.
+  7. **`DiagnosticsScreen` native heap allocation row (§207)** — `android.os.Debug.getNativeHeapAllocatedSize()`; `DiagInfoRow("Native heap", "N MB alloc")` after Total RAM.
+  8. **`GoalsScreen` TemplatesTab blank empty state when nothing to show (§209)** — `BookmarkBorder` icon + "No templates yet" when `searchQuery.isBlank() && both lists empty`.
+  9. **`SafetyScreen` AllowlistSection "N apps allowed" count chip (§210)** — `Text("N app(s) allowed", Success)` above add-package Row when `allowlistMode && packages.isNotEmpty()`.
+  **Files changed:** `ActivityScreen.kt` (×3), `ModulesScreen.kt`, `SafetyScreen.kt` (×2), `TrainScreen.kt`, `DiagnosticsScreen.kt`, `GoalsScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 24 — closed GAP_AUDIT §189–§200 (12 items):**
   1. **`ChatScreen` "Export chat" share button (§189)** — TextButton + Share icon below ContextTagBar when `messages.size > 1`; shares all messages as "You: / ARIA:" plain text.
   2. **`ActivityScreen` MemoryList sort-by-reward FilterChip (§190)** — `var sortByReward` state + `FilterChip("↑ Reward"/"Recent")` in the chips Row; Success color when selected.

@@ -201,6 +201,9 @@ fun DiagnosticsScreen(
                 DiagInfoRow("Android",   "${Build.VERSION.RELEASE}  (API ${Build.VERSION.SDK_INT})")
                 DiagInfoRow("ABI",       Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
                 DiagInfoRow("Total RAM", "${memInfo.totalMem / (1024 * 1024)} MB")
+                // Round 25 §207: native heap allocation (JNI/C++ side — where llama.cpp lives).
+                val nativeHeapMb = android.os.Debug.getNativeHeapAllocatedSize() / 1_048_576L
+                DiagInfoRow("Native heap", "${nativeHeapMb} MB alloc")
                 DiagInfoRow("Avail RAM", "${memInfo.availMem  / (1024 * 1024)} MB  " +
                     "(${(memInfo.availMem * 100 / memInfo.totalMem.coerceAtLeast(1)).toInt()}% free)")
                 DiagInfoRow("Low RAM",   if (memInfo.lowMemory) "YES ⚠" else "No")

@@ -1346,7 +1346,10 @@ private fun AppSkillRow(skill: AppSkillItem) {
         skill.successRate >= 0.50f -> ARIAColors.Warning
         else                       -> ARIAColors.Error
     }
+    // Round 25 §202: expand/collapse to show package name + last-run detail.
+    var expanded by remember { mutableStateOf(false) }
 
+    Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1419,4 +1422,24 @@ private fun AppSkillRow(skill: AppSkillItem) {
             }
         }
     }
+    // Round 25 §202: expandable detail — shows full package name on tap.
+    if (expanded) {
+        Row(
+            modifier              = Modifier.fillMaxWidth().padding(top = 4.dp, start = 46.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Apps, null, tint = ARIAColors.Muted, modifier = Modifier.size(11.dp))
+            Text(
+                skill.appPackage,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color          = ARIAColors.Muted,
+                    fontSize       = 9.sp,
+                    fontFamily     = FontFamily.Monospace,
+                ),
+                maxLines = 1,
+            )
+        }
+    }
+    }  // close Column wrapper
 }
