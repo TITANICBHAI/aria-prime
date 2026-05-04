@@ -161,6 +161,20 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 21 — closed GAP_AUDIT §153–§164 (12 items):**
+  1. **`AgentViewModel` `agentLoopErrors: Int = 0` in `SessionStatsUiState` (§153)** — cumulative error counter persists across the session.
+  2. **`AgentViewModel` increment `agentLoopErrors` on "error" status (§154)** — `_sessionStats.update { copy(agentLoopErrors + 1) }` inside `handleStatusChanged`.
+  3. **`DashboardScreen` `LearningStat` `valueColor` param + colored Loss chip (§155)** — `valueColor: Color = ARIAColors.Accent`; Loss uses green/amber/red severity palette.
+  4. **`AgentViewModel` `fun clearActionLog()` (§156)** — public method sets `_actionLogs.value = emptyList()`.
+  5. **`ActivityScreen` "Clear log" chip with confirmation dialog in ActionsList (§157)** — `InputChip(DeleteSweep, "Clear log")` in filter row; confirmation `AlertDialog` before clearing; `onClearLog` param threaded from call site.
+  6. **`GoalsScreen` TemplatesTab empty-state block (§158)** — centered `SearchOff` icon + "No results for X" when both `filteredTemplates` and `filteredRecentGoals` are empty while searchQuery active.
+  7. **`DiagnosticsScreen` JVM heap usage + loop errors ARIACard (§159)** — first card in scroll: "Heap used / Heap max / Loop errors" three-column stats row; collects `vm.sessionStats`.
+  8. **`ControlScreen` token-rate `%.1f t/s` chip in header (§160)** — Success-tinted chip appended after status dot when `status == "running" && tokenRate > 0`.
+  9. **`ModulesScreen` "Refresh all" chip (§161)** — single combined chip replacing two icon buttons; calls both `vm.refreshAppSkills()` + `vm.refreshModuleState()`.
+  10. **`ChatScreen` loaded model name in contextLine (§162)** — collects `vm.loadedLlms`; first loaded model's `modelId` filename prepended to context sub-label.
+  11. **`TrainScreen` adapter file size in KB (§163)** — adapter filename wrapped in `Row` with `"${sizeKb} KB"` Success text when file exists.
+  12. **`DiagnosticsScreen` `agentLoopErrors` loop-errors stat column (§164)** — third column in §159 card; color Success when 0, Error when > 0.
+  **Files changed:** `AgentViewModel.kt` (×4), `DashboardScreen.kt` (×2), `ActivityScreen.kt` (×3), `GoalsScreen.kt`, `DiagnosticsScreen.kt` (×2), `ControlScreen.kt`, `ModulesScreen.kt`, `ChatScreen.kt`, `TrainScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 20 — closed GAP_AUDIT §141–§152 (12 items):**
   1. **`DashboardScreen` "Last task" preview when idle (§141)** — 9 sp monospace `"Last: {goal.take(55)}"` shown below status card when idle + lastCompletedGoal set.
   2. **`GoalsScreen` TemplatesTab filter recentGoals by searchQuery (§142)** — `filteredRecentGoals` via `remember(searchQuery, recentGoals)`; both `if()` guard and `items(...)` use filtered list.

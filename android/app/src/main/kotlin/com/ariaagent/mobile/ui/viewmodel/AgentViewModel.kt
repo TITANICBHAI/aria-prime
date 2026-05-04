@@ -340,6 +340,8 @@ data class SessionStatsUiState(
     val inferenceTimeoutCount: Int = 0, // Round 12: cumulative LLM inference timeouts this session
     // Round 20 §144: total user chat messages sent this session.
     val chatMessagesCount: Int   = 0,
+    // Round 21 §153: cumulative agent-loop errors this session.
+    val agentLoopErrors: Int     = 0,
 ) {
     val successRate: Float
         get() = if (tasksCompleted + tasksErrored == 0) 0f
@@ -848,6 +850,10 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
                                     prevState.currentTask
                                 else prev.lastCompletedGoal,
         )}
+        // Round 21 §154: increment session error counter when agent enters error state.
+        if (status == "error") {
+            _sessionStats.update { it.copy(agentLoopErrors = it.agentLoopErrors + 1) }
+        }
         if (status == "idle" || status == "done" || status == "error") {
             _streamBuffer.value = ""
             _stepState.value = StepUiState()
@@ -1768,6 +1774,11 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             TaskQueueManager.remove(context, taskId)
             _taskQueue.update { prev -> prev.filter { it.id != taskId } }
         }
+    }
+
+    // Round 21 §156: clear all entries from the in-memory action log.
+    fun clearActionLog() {
+        _actionLogs.value = emptyList()
     }
 
     fun clearTaskQueue() {

@@ -62,6 +62,10 @@ fun DiagnosticsScreen(
     val status        by vm.orchestrationStatus.collectAsStateWithLifecycle()
     val events        by vm.orchestrationEvents.collectAsStateWithLifecycle()
     val overlayActive by vm.floatingChatActive.collectAsStateWithLifecycle()
+    // Round 21 §159/§164: collect session stats for agentLoopErrors and heap display.
+    val sessionStats  by vm.sessionStats.collectAsState()
+    val heapUsedMb    = remember { Runtime.getRuntime().let { (it.totalMemory() - it.freeMemory()) / 1_048_576L } }
+    val heapMaxMb     = remember { Runtime.getRuntime().maxMemory() / 1_048_576L }
 
     LaunchedEffect(Unit) {
         vm.refreshOrchestrationStatus()
@@ -109,6 +113,28 @@ fun DiagnosticsScreen(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+
+            // Round 21 §159/§164: JVM heap usage + session loop error count card.
+            ARIACard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${heapUsedMb} MB", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Accent, fontWeight = FontWeight.Bold))
+                        Text("Heap used", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${heapMaxMb} MB", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted, fontWeight = FontWeight.Bold))
+                        Text("Heap max", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val errColor = if (sessionStats.agentLoopErrors > 0) ARIAColors.Error else ARIAColors.Success
+                        Text("${sessionStats.agentLoopErrors}", style = MaterialTheme.typography.bodySmall.copy(color = errColor, fontWeight = FontWeight.Bold))
+                        Text("Loop errors", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                    }
+                }
+            }
 
             // ── Floating-chat overlay toggle ────────────────────────────────
             ARIACard {

@@ -133,13 +133,18 @@ fun ModulesScreen(
                         )
                     }
                 }
-                IconButton(onClick = { vm.refreshAppSkills() }) {
-                    Icon(Icons.Default.Psychology, contentDescription = "Refresh skills",
-                        tint = ARIAColors.Muted, modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = { vm.refreshModuleState() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh modules",
-                        tint = ARIAColors.Muted)
+                // Round 21 §161: "Refresh all" chip combines both individual refresh actions.
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ARIAColors.Primary.copy(alpha = 0.10f))
+                        .clickable { vm.refreshAppSkills(); vm.refreshModuleState() }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Refresh, null, tint = ARIAColors.Primary, modifier = Modifier.size(14.dp))
+                        Text("Refresh all", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Primary, fontWeight = FontWeight.SemiBold, fontSize = 10.sp))
+                    }
                 }
             }
         }

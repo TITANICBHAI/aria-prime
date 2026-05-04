@@ -453,7 +453,12 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                 LearningStat("Policy", "v${learningState.policyVersion}")
                 LearningStat("Adam Steps", "${learningState.adamStep}")
                 if (learningState.lastPolicyLoss > 0.0) {
-                    LearningStat("Loss", String.format("%.4f", learningState.lastPolicyLoss))
+                    val lossColor = when {
+                        learningState.lastPolicyLoss < 0.05 -> ARIAColors.Success
+                        learningState.lastPolicyLoss < 0.30 -> ARIAColors.Warning
+                        else                                -> ARIAColors.Error
+                    }
+                    LearningStat("Loss", String.format("%.4f", learningState.lastPolicyLoss), valueColor = lossColor)
                 }
             }
             if (learningState.untrainedSamples > 0) {
@@ -677,10 +682,11 @@ private fun GameStat(label: String, value: String) {
 }
 
 @Composable
-private fun LearningStat(label: String, value: String) {
+private fun LearningStat(label: String, value: String, valueColor: Color = ARIAColors.Accent) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Round 21 §155: support optional valueColor for severity tinting (e.g. Loss).
         Text(value, style = MaterialTheme.typography.bodySmall.copy(
-            color = ARIAColors.Accent, fontWeight = FontWeight.Bold))
+            color = valueColor, fontWeight = FontWeight.Bold))
         Text(label, style = MaterialTheme.typography.labelSmall.copy(
             color = ARIAColors.Muted, fontSize = 10.sp))
     }

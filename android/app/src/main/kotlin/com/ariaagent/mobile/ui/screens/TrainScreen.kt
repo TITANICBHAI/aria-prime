@@ -296,12 +296,26 @@ private fun RlStatusCard(
         // recomposition setting status = null can't cause a NullPointerException on !!
         val adapterPath = status?.latestAdapterPath
         if (!adapterPath.isNullOrBlank()) {
-            Text(
-                text     = adapterPath.substringAfterLast('/'),
-                color    = ARIAColors.TextMuted,
-                fontSize = 11.sp,
-                maxLines = 1,
-            )
+            val adapterFile = java.io.File(adapterPath)
+            val sizeKb      = if (adapterFile.exists()) adapterFile.length() / 1024L else -1L
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text     = adapterPath.substringAfterLast('/'),
+                    color    = ARIAColors.TextMuted,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // Round 21 §163: adapter file size in KB alongside the filename.
+                if (sizeKb >= 0L) {
+                    Text(
+                        "${sizeKb} KB",
+                        color    = ARIAColors.Success,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
         }
 
         if (status != null && status.adamStep > 0) {

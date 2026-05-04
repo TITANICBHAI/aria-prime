@@ -626,6 +626,20 @@ private fun TemplatesTab(
             )
         }
 
+        // Round 21 §158: empty state when search query yields no results in either list.
+        if (searchQuery.isNotBlank() && filteredTemplates.isEmpty() && filteredRecentGoals.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.SearchOff, null, tint = ARIAColors.Muted, modifier = Modifier.size(40.dp))
+                    Text("No results for \"$searchQuery\"", style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface))
+                    Text("Try a different keyword", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted))
+                }
+            }
+        }
+
         LazyVerticalGrid(
             columns         = GridCells.Fixed(2),
             modifier        = Modifier.fillMaxSize(),

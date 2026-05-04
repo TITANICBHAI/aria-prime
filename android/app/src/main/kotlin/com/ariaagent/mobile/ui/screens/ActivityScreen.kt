@@ -343,7 +343,7 @@ fun ActivityScreen(vm: AgentViewModel = viewModel()) {
 
         // ── Content per tab ───────────────────────────────────────────────────
         when (activeTab) {
-            ActivityTab.Actions -> ActionsList(logs = actionLogs)
+            ActivityTab.Actions -> ActionsList(logs = actionLogs, onClearLog = { vm.clearActionLog() })
             ActivityTab.Memory  -> MemoryList(entries = memoryEntries, stats = memoryStats)
             ActivityTab.Labels  -> LabelsList(labels = allLabels)
             ActivityTab.Replay  -> ReplayList(sessions = replaySessions, replaySteps = replaySteps, vm = vm)
@@ -361,7 +361,7 @@ private enum class ActionDateFilter(val label: String) {
 }
 
 @Composable
-private fun ActionsList(logs: List<ActionLogEntry>) {
+private fun ActionsList(logs: List<ActionLogEntry>, onClearLog: () -> Unit = {}) {
     var dateFilter  by remember { mutableStateOf(ActionDateFilter.ALL) }
     // Round 18 §118: action-log search filter by tool name or target node ID.
     var actionSearch by remember { mutableStateOf("") }
@@ -407,6 +407,28 @@ private fun ActionsList(logs: List<ActionLogEntry>) {
                         labelColor                = ARIAColors.Muted,
                     )
                 )
+            }
+            // Round 21 §157: "Clear log" chip to wipe all action log entries.
+            item {
+                if (logs.isNotEmpty()) {
+                    var showConfirm by remember { mutableStateOf(false) }
+                    if (showConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showConfirm = false },
+                            title   = { Text("Clear action log?") },
+                            text    = { Text("All ${logs.size} entries will be removed from the in-memory log.") },
+                            confirmButton = { TextButton(onClick = { onClearLog(); showConfirm = false }) { Text("Clear", color = ARIAColors.Destructive) } },
+                            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Cancel") } },
+                        )
+                    }
+                    InputChip(
+                        selected = false,
+                        onClick  = { showConfirm = true },
+                        label    = { Text("Clear log", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Destructive)) },
+                        leadingIcon = { Icon(Icons.Default.DeleteSweep, null, tint = ARIAColors.Destructive, modifier = Modifier.size(14.dp)) },
+                        colors   = InputChipDefaults.inputChipColors(containerColor = ARIAColors.Destructive.copy(alpha = 0.08f)),
+                    )
+                }
             }
             item {
                 if (filtered.size != logs.size) {

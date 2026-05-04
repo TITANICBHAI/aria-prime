@@ -77,8 +77,13 @@ fun ChatScreen(vm: AgentViewModel) {
     val scope        = rememberCoroutineScope()
     val llmLoaded    = agentState.modelLoaded
 
-    val contextLine = remember(agentState, taskQueue, appSkills, messages.size) {
+    // Round 21 §162: collect loadedLlms so we can show the active model name in the header.
+    val loadedLlms   by vm.loadedLlms.collectAsState()
+    val contextLine = remember(agentState, taskQueue, appSkills, messages.size, loadedLlms) {
         val parts = mutableListOf<String>()
+        // Round 21 §162: show active model name when LLM is loaded.
+        val activeModel = loadedLlms.values.firstOrNull { it.isLoaded }?.modelId?.substringAfterLast('/')?.take(20)
+        if (!activeModel.isNullOrBlank()) parts += activeModel
         if (agentState.status != "idle") parts += "agent: ${agentState.status}"
         if (taskQueue.isNotEmpty()) parts += "${taskQueue.size} queued"
         if (appSkills.isNotEmpty()) parts += "${appSkills.size} skills"

@@ -188,6 +188,22 @@ fun ControlScreen(
                     agentState.status.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
                 )
+                // Round 21 §160: show token rate chip next to status when running.
+                if (agentState.status == "running" && agentState.tokenRate > 0.0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(ARIAColors.Success.copy(alpha = 0.12f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "%.1f t/s".format(agentState.tokenRate),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Success, fontWeight = FontWeight.SemiBold, fontSize = 9.sp
+                            )
+                        )
+                    }
+                }
             }
         }
 
