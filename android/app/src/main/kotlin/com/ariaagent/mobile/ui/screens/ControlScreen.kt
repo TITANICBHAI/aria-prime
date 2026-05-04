@@ -196,6 +196,35 @@ fun ControlScreen(
             HardwareMeterRow(stats = hwStats)
         }
 
+        // Round 18 §117: compact running-task banner — shows the active task at a glance.
+        if (!isIdle && agentState.currentTask.isNotBlank()) {
+            val bannerTint = when (agentState.status) {
+                "running" -> ARIAColors.Success
+                "error"   -> ARIAColors.Error
+                else      -> ARIAColors.Warning
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(bannerTint.copy(alpha = 0.11f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(bannerTint))
+                Text(
+                    agentState.currentTask.take(58),
+                    style    = MaterialTheme.typography.labelSmall.copy(
+                        color    = ARIAColors.OnSurface,
+                        fontSize = 11.sp,
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
         // ── Permissions banner ────────────────────────────────────────────────
         // Shown whenever a required permission is missing so the user knows
         // exactly what to fix before starting the agent.
@@ -861,6 +890,14 @@ fun ControlScreen(
                         fontSize   = 9.sp,
                     ),
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                )
+                // Round 18 §125: queue fill progress bar (max 20 tasks).
+                val queueFill = (taskQueue.size / 20f).coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress          = { queueFill },
+                    modifier          = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                    color             = ARIAColors.Primary,
+                    trackColor        = ARIAColors.Surface3,
                 )
             }
 

@@ -479,6 +479,14 @@ private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Lon
                              else "${lastDurSec}s"
                 SessionStat("Last Task", durStr)
             }
+            // Round 18 §119: avg per-step inference latency chip.
+            if (stats.avgStepDurationMs > 0L) {
+                SessionStat("ms/Step", "${stats.avgStepDurationMs}")
+            }
+            // Round 18 §128: inference-timeout count chip — warning tint when > 0.
+            if (stats.inferenceTimeoutCount > 0) {
+                SessionStat("Timeouts", "${stats.inferenceTimeoutCount}", valueColor = ARIAColors.Warning)
+            }
         }
         if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {
             Spacer(Modifier.height(6.dp))
@@ -498,10 +506,11 @@ private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Lon
     }
 }
 
+// Round 18 §128: optional valueColor for warning/error-tinted chips (e.g. timeout count).
 @Composable
-private fun SessionStat(label: String, value: String) {
+private fun SessionStat(label: String, value: String, valueColor: Color = ARIAColors.OnSurface) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+        Text(value, style = MaterialTheme.typography.bodyMedium.copy(color = valueColor, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
         Text(label, style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp))
     }
 }

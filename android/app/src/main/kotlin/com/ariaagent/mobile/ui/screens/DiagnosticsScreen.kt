@@ -353,9 +353,13 @@ fun DiagnosticsScreen(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
+                        // Round 18 §121: show matching count when log filter is active.
                         Text(
                             if (crashLines.isEmpty()) "No log file found"
-                            else "${crashLines.size} lines from app.log",
+                            else if (logFilter.isNotBlank()) {
+                                val matching = crashLines.count { it.contains(logFilter, ignoreCase = true) }
+                                "$matching / ${crashLines.size} matching"
+                            } else "${crashLines.size} lines from app.log",
                             style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
                         )
                         if (crashLines.isNotEmpty()) {

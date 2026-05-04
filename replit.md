@@ -161,6 +161,20 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 18 — closed GAP_AUDIT §117–§128 (12 items):**
+  1. **`ControlScreen` running-task banner (§117)** — When `!isIdle && currentTask.isNotBlank()`, a tinted pill-row (green/red/amber dot + truncated task text) renders below hardware meters card.
+  2. **`ActivityScreen` action-log search state (§118)** — `var actionSearch` added to `ActionsList`; `filtered` now trims by `tool` or `nodeId` containment when non-blank.
+  3. **`DashboardScreen` avg step-duration chip (§119)** — `SessionStat("ms/Step", "…")` chip appended to stats row when `avgStepDurationMs > 0`.
+  4. **`TrainScreen` IRL extraction yield rate (§120)** — `"N% extraction yield"` line in accent monospace 10 sp below tuples row when `framesProcessed > 0`.
+  5. **`DiagnosticsScreen` matching line count in header (§121)** — Header text shows `"N / M matching"` instead of total when `logFilter.isNotBlank()`.
+  6. **`SafetyScreen` blocked-app count in section label (§122)** — `SafetySectionLabel` title becomes `"Blocked Apps (N)"` when blocklist is non-empty.
+  7. **`AgentViewModel` `clearError()` resets `lastErrorAt` (§123)** — `clearError()` now sets `lastErrorAt = 0L` in addition to clearing status/lastError.
+  8. **`GoalsScreen` active triggers count badge (§124)** — `"ACTIVE TRIGGERS"` header wrapped in `Row` with an Accent-tinted `"N"` badge.
+  9. **`ControlScreen` queue fill progress bar (§125)** — 3 dp `LinearProgressIndicator` below estimated wait label; `progress = taskQueue.size / 20f`.
+  10. **`ChatScreen` model-not-loaded warning banner (§126)** — Warning-tinted row with `Warning` icon shown between `ContextTagBar` and `HardwareMeterRow` when `!llmLoaded`.
+  11. **`ActivityScreen` action-log search field UI (§127)** — Full-width `OutlinedTextField` (Search+Clear icons) between date-chip row and action list; empty state message adapts to search query.
+  12. **`DashboardScreen` `SessionStat` color param + timeout chip (§128)** — `SessionStat` gains `valueColor` param; `"Timeouts"` chip shown in `ARIAColors.Warning` when `inferenceTimeoutCount > 0`.
+  **Files changed:** `ControlScreen.kt` (×2), `ActivityScreen.kt` (×2), `DashboardScreen.kt` (×3), `TrainScreen.kt`, `DiagnosticsScreen.kt`, `SafetyScreen.kt`, `AgentViewModel.kt`, `GoalsScreen.kt`, `ChatScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 17 — closed GAP_AUDIT §105–§116 (12 items):**
   1. **`OnboardingScreen` overall progress bar (§105)** — 3 dp `LinearProgressIndicator` at top of onboarding `Column`; advances from 0 → 100% across all 6 steps.
   2. **`TrainScreen` total adapter disk usage (§106)** — `LoraHistoryCard` header shows `totalKb = checkpoints.sumOf { it.sizeKb }` as `"X.X MB total"` in accent monospace below the adapter count.

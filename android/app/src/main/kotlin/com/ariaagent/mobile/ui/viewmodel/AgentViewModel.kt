@@ -1912,7 +1912,8 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
      * Used by Dashboard "Dismiss" quick action after a task failure.
      */
     fun clearError() {
-        _agentState.update { it.copy(status = "idle", lastError = "") }
+        // Round 18 §123: also reset lastErrorAt so the Dashboard error timestamp disappears.
+        _agentState.update { it.copy(status = "idle", lastError = "", lastErrorAt = 0L) }
     }
 
     /**

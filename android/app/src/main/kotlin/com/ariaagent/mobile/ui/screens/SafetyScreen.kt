@@ -184,7 +184,13 @@ fun SafetyScreen(
         // ── 3. Blocked Apps ───────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(16.dp))
-            SafetySectionLabel("Blocked Apps", Icons.Default.Block, ARIAColors.Destructive)
+            // Round 18 §122: include live count in the Blocked Apps section label.
+            SafetySectionLabel(
+                if (safetyConfig.blockedPackages.isNotEmpty())
+                    "Blocked Apps (${safetyConfig.blockedPackages.size})"
+                else "Blocked Apps",
+                Icons.Default.Block, ARIAColors.Destructive
+            )
             Spacer(Modifier.height(8.dp))
         }
         item {

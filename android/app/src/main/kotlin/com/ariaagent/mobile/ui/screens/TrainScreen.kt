@@ -533,6 +533,15 @@ private fun IrlCard(
                         Text("${result.tuplesExtracted} tuples", color = ARIAColors.TextPrimary, fontSize = 12.sp)
                         Text("${result.llmAssistedCount} LLM-assisted", color = ARIAColors.TextPrimary, fontSize = 12.sp)
                     }
+                    // Round 18 §120: extraction yield rate (tuples / frames).
+                    if (result.framesProcessed > 0) {
+                        Text(
+                            "${"%.0f".format(result.tuplesExtracted * 100.0 / result.framesProcessed)}% extraction yield",
+                            color      = ARIAColors.Accent,
+                            fontSize   = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
                     Text("Tuples stored — run an RL cycle to train on them.", color = ARIAColors.TextMuted, fontSize = 11.sp)
                 } else {
                     Text("✗ Processing failed", color = ARIAColors.Error, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)

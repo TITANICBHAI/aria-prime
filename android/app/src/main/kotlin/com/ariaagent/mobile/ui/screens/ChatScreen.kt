@@ -127,6 +127,26 @@ fun ChatScreen(vm: AgentViewModel) {
 
         ContextTagBar(taskQueueCount = taskQueue.size, appSkillsCount = appSkills.size)
 
+        // Round 18 §126: model-not-loaded micro-warning so the user knows why replies fail.
+        if (!llmLoaded) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(ARIAColors.Warning.copy(alpha = 0.12f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = ARIAColors.Warning, modifier = Modifier.size(13.dp))
+                Text(
+                    "Model not loaded — go to Modules to load a model",
+                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Warning, fontSize = 10.sp),
+                )
+            }
+        }
+
         HardwareMeterRow(
             stats    = hwStats,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)

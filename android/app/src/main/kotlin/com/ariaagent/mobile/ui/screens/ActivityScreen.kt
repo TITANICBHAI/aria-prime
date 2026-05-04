@@ -362,7 +362,9 @@ private enum class ActionDateFilter(val label: String) {
 
 @Composable
 private fun ActionsList(logs: List<ActionLogEntry>) {
-    var dateFilter by remember { mutableStateOf(ActionDateFilter.ALL) }
+    var dateFilter  by remember { mutableStateOf(ActionDateFilter.ALL) }
+    // Round 18 §118: action-log search filter by tool name or target node ID.
+    var actionSearch by remember { mutableStateOf("") }
     val cutoffMs = remember(dateFilter) {
         when (dateFilter) {
             ActionDateFilter.TODAY -> System.currentTimeMillis() - 86_400_000L
@@ -370,9 +372,14 @@ private fun ActionsList(logs: List<ActionLogEntry>) {
             ActionDateFilter.ALL   -> 0L
         }
     }
-    val filtered = remember(logs, dateFilter) {
-        if (dateFilter == ActionDateFilter.ALL) logs
-        else logs.filter { it.timestamp >= cutoffMs }
+    val filtered = remember(logs, dateFilter, actionSearch) {
+        var result = if (dateFilter == ActionDateFilter.ALL) logs
+                     else logs.filter { it.timestamp >= cutoffMs }
+        if (actionSearch.isNotBlank()) result = result.filter {
+            it.tool.contains(actionSearch, ignoreCase = true) ||
+            it.nodeId.contains(actionSearch, ignoreCase = true)
+        }
+        result
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -412,11 +419,35 @@ private fun ActionsList(logs: List<ActionLogEntry>) {
             }
         }
 
+        // Round 18 §127: action-log search field.
+        OutlinedTextField(
+            value         = actionSearch,
+            onValueChange = { actionSearch = it },
+            modifier      = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            placeholder   = {
+                Text(
+                    "Search by tool or node…",
+                    style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted, fontSize = 11.sp)
+                )
+            },
+            leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) },
+            trailingIcon  = if (actionSearch.isNotBlank()) {{
+                IconButton(onClick = { actionSearch = "" }) {
+                    Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp))
+                }
+            }} else null,
+            singleLine    = true,
+            textStyle     = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+        )
+
         if (filtered.isEmpty()) {
             EmptyState(
                 icon    = Icons.Default.Timeline,
                 title   = if (logs.isEmpty()) "No actions yet" else "No actions in this period",
                 message = if (logs.isEmpty()) "Start the agent to see its actions here"
+                          else if (actionSearch.isNotBlank()) "No actions match \"$actionSearch\""
                           else "Try a wider date range"
             )
         } else {

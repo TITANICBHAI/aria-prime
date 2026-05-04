@@ -960,9 +960,33 @@ private fun TriggersTab(vm: AgentViewModel) {
             }
         } else {
             item {
-                Text("ACTIVE TRIGGERS",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = ARIAColors.Muted, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp))
+                // Round 18 §124: count badge alongside "ACTIVE TRIGGERS" header.
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        "ACTIVE TRIGGERS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                        )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(ARIAColors.Accent.copy(alpha = 0.15f))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            "${triggers.size}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color      = ARIAColors.Accent,
+                                fontWeight = FontWeight.Bold,
+                                fontSize   = 9.sp,
+                            )
+                        )
+                    }
+                }
             }
             items(triggers, key = { it.id }) { trigger ->
                 TriggerRow(
