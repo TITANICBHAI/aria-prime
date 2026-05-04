@@ -963,6 +963,39 @@ fun SettingsScreen(
                 fontWeight = FontWeight.Bold
             )
         }
+        // Round 23 §182: "Export config" OutlinedButton — shares key settings as plain text.
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                val text = buildString {
+                    appendLine("ARIA Configuration")
+                    appendLine("Model path: ${config.modelPath}")
+                    appendLine("Quantization: ${config.quantization}")
+                    appendLine("Context window: ${config.contextWindow}")
+                    appendLine("Temperature: ${config.temperatureX100 / 100.0}")
+                    appendLine("GPU layers: ${config.nGpuLayers}")
+                    appendLine("Flash attention: ${config.flashAttn}")
+                    appendLine("KV cache quant: ${config.kvCacheQuantization}")
+                    appendLine("RL enabled: ${config.rlEnabled}")
+                    if (!config.loraAdapterPath.isNullOrBlank()) appendLine("LoRA adapter: ${config.loraAdapterPath}")
+                }
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, text)
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "ARIA Config")
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }.let { android.content.Intent.createChooser(it, "Export config") }
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape    = RoundedCornerShape(12.dp),
+            border   = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Divider),
+        ) {
+            Icon(Icons.Default.Share, null, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Export configuration", fontSize = 13.sp)
+        }
 
         if (saveSuccess) {
             LaunchedEffect(saveSuccess) {

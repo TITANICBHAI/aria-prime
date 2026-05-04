@@ -304,6 +304,32 @@ private fun QueueTab(
                     }
                 }
             }
+            // Round 23 §181: "Share queue" chip to export task list as plain text.
+            if (taskQueue.isNotEmpty()) {
+                item {
+                    val shareCtx = LocalContext.current
+                    TextButton(
+                        onClick = {
+                            val text = taskQueue.mapIndexed { i, t ->
+                                "${i + 1}. ${t.goal}${if (t.appPackage.isNotBlank()) " [${t.appPackage}]" else ""}"
+                            }.joinToString("\n")
+                            shareCtx.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "ARIA Task Queue:\n$text")
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }.let { android.content.Intent.createChooser(it, "Share queue") }
+                            )
+                        },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                    ) {
+                        Icon(Icons.Default.Share, null, tint = ARIAColors.Muted, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Share queue", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                    }
+                }
+            }
+
             // Round 22 §171: estimated completion time based on avg step duration.
             if (avgStepDurationMs > 0L && taskQueue.isNotEmpty()) {
                 item {
@@ -1095,6 +1121,21 @@ private fun TriggersTab(vm: AgentViewModel) {
                     }
                 }
             }
+            // Round 23 §185: empty state when trigger search yields no results.
+            if (filteredTriggers.isEmpty() && triggerSearch.isNotBlank()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.SearchOff, null, tint = ARIAColors.Muted, modifier = Modifier.size(36.dp))
+                            Text("No triggers match \"$triggerSearch\"", style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface))
+                        }
+                    }
+                }
+            }
+
             items(filteredTriggers, key = { it.id }) { trigger ->
                 TriggerRow(
                     trigger   = trigger,

@@ -365,6 +365,17 @@ private fun RlStatusCard(
                 fontSize   = 10.sp,
                 fontFamily = FontFamily.Monospace,
             )
+            // Round 23 §180: RL training progress bar — shows progress within the current 1 K-step block.
+            val progressFraction = ((status.adamStep % 1_000).toFloat() / 1_000f).coerceIn(0f, 1f)
+            val progressLabel    = "${status.adamStep / 1_000}K+${status.adamStep % 1_000} / 1K block"
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress    = { progressFraction },
+                modifier    = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(3.dp)),
+                color       = if (status.lastPolicyLoss < 0.05) ARIAColors.Success else ARIAColors.Primary,
+                trackColor  = ARIAColors.Divider,
+            )
+            Text(progressLabel, color = ARIAColors.Muted, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
         }
 
         if (status != null && status.lastTrainedAt > 0L) {

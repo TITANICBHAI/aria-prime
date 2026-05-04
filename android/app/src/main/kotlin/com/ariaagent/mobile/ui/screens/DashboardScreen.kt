@@ -58,6 +58,8 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
     val lastTaskDurationMs     by vm.lastTaskDurationMs.collectAsStateWithLifecycle()
     val networkType        by vm.networkType.collectAsStateWithLifecycle()
     val uptimeSeconds      by vm.uptimeSeconds.collectAsStateWithLifecycle()
+    // Round 23 §183: collect taskQueue so we can show pending count chip.
+    val taskQueue          by vm.taskQueue.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.refreshPendingSuggestions() }
 
@@ -401,6 +403,26 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                         )
                     )
                 }
+            }
+        }
+
+        // Round 23 §183: pending tasks chip when the task queue is non-empty.
+        if (taskQueue.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ARIAColors.Accent.copy(alpha = 0.08f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Queue, null, tint = ARIAColors.Accent, modifier = Modifier.size(14.dp))
+                Text(
+                    "${taskQueue.size} task${if (taskQueue.size == 1) "" else "s"} pending in queue",
+                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Accent, fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 

@@ -161,6 +161,17 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 23 — closed GAP_AUDIT §177–§188 (12 items):**
+  1. **`DiagnosticsScreen` device uptime in device info card (§177)** — `SystemClock.elapsedRealtime()` → `DiagInfoRow("Device uptime", "Xh Ym")`.
+  2. **`ActivityScreen` LabelsList no-results empty state (§179)** — `SearchOff` icon + `"No labels match X"` box when `displayLabels.isEmpty() && labelSearch.isNotBlank()`.
+  3. **`TrainScreen` RL training progress bar (§180)** — `LinearProgressIndicator((adamStep % 1000) / 1000f)` after estimated-samples line; color Success < 0.05 loss else Primary; `"Nk+M / 1K block"` label.
+  4. **`GoalsScreen` QueueTab "Share queue" chip (§181)** — `TextButton(Share + "Share queue")` when `taskQueue.isNotEmpty()`; shares numbered task list as plain text.
+  5. **`SettingsScreen` "Export configuration" OutlinedButton (§182)** — After Save button; shares key config fields (model, quant, context, temp, GPU, flash attn, RL, LoRA) as plain text via `ACTION_SEND`.
+  6. **`DashboardScreen` pending tasks chip + `taskQueue` collection (§183)** — `vm.taskQueue.collectAsStateWithLifecycle()`; Accent `"N task(s) pending in queue"` chip above SYSTEM card when queue non-empty.
+  7. **`ModulesScreen` total loaded model RAM chip in header (§184)** — `remember(loadedLlms) { sumOf { displaySizeMb } }`; Warning `"~N MB"` chip in header Row when > 0.
+  8. **`GoalsScreen` TriggersTab search empty state (§185)** — `SearchOff` icon + `"No triggers match X"` when `filteredTriggers.isEmpty() && triggerSearch.isNotBlank()`.
+  9. **`DiagnosticsScreen` session age column in heap stats card (§186)** — Fourth stat column `"Nm / Session age"` using `(currentTimeMs - sessionStartMs) / 60_000`.
+  **Files changed:** `DiagnosticsScreen.kt` (×2), `ActivityScreen.kt`, `TrainScreen.kt`, `GoalsScreen.kt` (×2), `SettingsScreen.kt`, `DashboardScreen.kt` (×2), `ModulesScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 22 — closed GAP_AUDIT §165–§176 (12 items):**
   1. **`DashboardScreen` SessionStatsCard `uptimeSeconds` + Uptime chip (§165)** — `uptimeSeconds: Long = 0L` param; `SessionStat("Uptime", "Xm Ys")` chip when running.
   2. **`DashboardScreen` SessionStatsCard "Reset" TextButton (§166)** — `onResetSession: (() -> Unit)?` param; shown when `tasksCompleted + tasksErrored > 0`; calls `vm.resetSession()`.

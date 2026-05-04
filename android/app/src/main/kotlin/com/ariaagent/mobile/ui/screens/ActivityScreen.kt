@@ -864,6 +864,20 @@ private fun LabelsList(labels: List<com.ariaagent.mobile.core.memory.ObjectLabel
                     )
                 }
             }
+            // Round 23 §179: empty state when search yields no matching labels.
+            if (displayLabels.isEmpty() && labelSearch.isNotBlank()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.SearchOff, null, tint = ARIAColors.Muted, modifier = Modifier.size(36.dp))
+                            Text("No labels match \"$labelSearch\"", style = MaterialTheme.typography.bodyMedium.copy(color = ARIAColors.OnSurface))
+                        }
+                    }
+                }
+            }
             items(displayLabels, key = { it.id }) { label ->
                 LabelRow(label = label)
             }

@@ -114,7 +114,7 @@ fun DiagnosticsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
 
-            // Round 21 §159/§164: JVM heap usage + session loop error count card.
+            // Round 21 §159/§164 + Round 23 §186: JVM heap usage, session loop errors, + session start time.
             ARIACard {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -132,6 +132,12 @@ fun DiagnosticsScreen(
                         val errColor = if (sessionStats.agentLoopErrors > 0) ARIAColors.Error else ARIAColors.Success
                         Text("${sessionStats.agentLoopErrors}", style = MaterialTheme.typography.bodySmall.copy(color = errColor, fontWeight = FontWeight.Bold))
                         Text("Loop errors", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                    }
+                    // Round 23 §186: session duration since start.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val sessionAgeMin = (System.currentTimeMillis() - sessionStats.sessionStartMs) / 60_000L
+                        Text("${sessionAgeMin}m", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Primary, fontWeight = FontWeight.Bold))
+                        Text("Session age", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
                     }
                 }
             }
@@ -198,6 +204,10 @@ fun DiagnosticsScreen(
                 DiagInfoRow("Avail RAM", "${memInfo.availMem  / (1024 * 1024)} MB  " +
                     "(${(memInfo.availMem * 100 / memInfo.totalMem.coerceAtLeast(1)).toInt()}% free)")
                 DiagInfoRow("Low RAM",   if (memInfo.lowMemory) "YES ⚠" else "No")
+                // Round 23 §177: device uptime from SystemClock elapsed real-time.
+                val uptimeMs = android.os.SystemClock.elapsedRealtime()
+                val uptimeTotalMin = uptimeMs / 60_000L
+                DiagInfoRow("Device uptime", "${uptimeTotalMin / 60}h ${uptimeTotalMin % 60}m")
             }
 
             // ── Orchestrator header ─────────────────────────────────────────

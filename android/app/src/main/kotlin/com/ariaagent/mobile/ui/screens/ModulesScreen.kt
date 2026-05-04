@@ -133,6 +133,28 @@ fun ModulesScreen(
                         )
                     }
                 }
+                // Round 23 §184: total estimated RAM occupied by loaded models.
+                val totalLoadedMb = remember(loadedLlms) {
+                    loadedLlms.values.filter { it.isLoaded }
+                        .sumOf { entry ->
+                            com.ariaagent.mobile.core.model.ModelCatalog.findById(entry.modelId)?.displaySizeMb ?: 0
+                        }
+                }
+                if (totalLoadedMb > 0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ARIAColors.Warning.copy(alpha = 0.10f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "~${totalLoadedMb} MB",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Warning, fontWeight = FontWeight.Bold, fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
                 // Round 21 §161: "Refresh all" chip combines both individual refresh actions.
                 Box(
                     modifier = Modifier
