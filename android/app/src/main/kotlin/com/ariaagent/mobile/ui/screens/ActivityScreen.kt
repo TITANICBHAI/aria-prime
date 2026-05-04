@@ -571,6 +571,32 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                     )
                 }
             }
+            // Round 17 §109: memory search bar — filter by app package or summary.
+            item {
+                OutlinedTextField(
+                    value         = memSearch,
+                    onValueChange = { memSearch = it },
+                    modifier      = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    placeholder   = { Text("Search by app or summary…", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)) },
+                    leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(16.dp)) },
+                    trailingIcon  = {
+                        if (memSearch.isNotBlank()) {
+                            IconButton(onClick = { memSearch = "" }) {
+                                Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape      = RoundedCornerShape(8.dp),
+                    colors     = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = ARIAColors.Primary,
+                        unfocusedBorderColor = ARIAColors.Divider,
+                        focusedTextColor     = ARIAColors.OnSurface,
+                        unfocusedTextColor   = ARIAColors.OnSurface,
+                        cursorColor          = ARIAColors.Primary,
+                    ),
+                )
+            }
             // ── Gap 8: Stats bar ──────────────────────────────────────────────
             if (stats.total > 0) {
                 item {

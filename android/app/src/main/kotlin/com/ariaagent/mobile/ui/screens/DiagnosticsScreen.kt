@@ -373,6 +373,32 @@ fun DiagnosticsScreen(
                         }
                     }
                     if (logExpanded && crashLines.isNotEmpty()) {
+                        // Round 17 §111: filter bar + filtered log display.
+                        OutlinedTextField(
+                            value         = logFilter,
+                            onValueChange = { logFilter = it },
+                            modifier      = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                            placeholder   = { Text("Filter log lines…", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted, fontSize = 10.sp)) },
+                            leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(14.dp)) },
+                            trailingIcon  = {
+                                if (logFilter.isNotBlank()) {
+                                    IconButton(onClick = { logFilter = "" }) {
+                                        Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape      = RoundedCornerShape(6.dp),
+                            colors     = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = ARIAColors.Primary,
+                                unfocusedBorderColor = ARIAColors.Divider,
+                                focusedTextColor     = ARIAColors.OnSurface,
+                                unfocusedTextColor   = ARIAColors.OnSurface,
+                                cursorColor          = ARIAColors.Primary,
+                            ),
+                        )
+                        val visibleLines = if (logFilter.isBlank()) crashLines.takeLast(40)
+                            else crashLines.filter { it.contains(logFilter, ignoreCase = true) }.takeLast(40)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -380,7 +406,7 @@ fun DiagnosticsScreen(
                                 .padding(8.dp)
                         ) {
                             Text(
-                                crashLines.takeLast(40).joinToString("\n"),
+                                visibleLines.joinToString("\n"),
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color      = ARIAColors.OnSurface,
                                     fontFamily = FontFamily.Monospace,

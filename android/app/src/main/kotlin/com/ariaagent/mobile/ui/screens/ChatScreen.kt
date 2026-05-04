@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -131,17 +132,33 @@ fun ChatScreen(vm: AgentViewModel) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
-        LazyColumn(
-            state                   = listState,
-            modifier                = Modifier.weight(1f),
-            contentPadding          = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement     = Arrangement.spacedBy(8.dp),
-        ) {
-            items(messages, key = { it.id }) { msg ->
-                ChatBubble(msg)
+        // Round 17 §114: scroll-to-bottom FAB when the user has scrolled away from the latest message.
+        val showScrollFab by remember { derivedStateOf { listState.canScrollForward } }
+        Box(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                state               = listState,
+                modifier            = Modifier.fillMaxSize(),
+                contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(messages, key = { it.id }) { msg ->
+                    ChatBubble(msg)
+                }
+                if (thinking) {
+                    item(key = "typing") { TypingIndicator() }
+                }
             }
-            if (thinking) {
-                item(key = "typing") { TypingIndicator() }
+            if (showScrollFab) {
+                SmallFloatingActionButton(
+                    onClick        = { scope.launch { listState.animateScrollToItem(messages.size) } },
+                    modifier       = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 8.dp),
+                    containerColor = ARIAColors.Primary,
+                    contentColor   = ARIAColors.Background,
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, "Scroll to bottom", modifier = Modifier.size(18.dp))
+                }
             }
         }
 

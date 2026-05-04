@@ -161,6 +161,20 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 17 — closed GAP_AUDIT §105–§116 (12 items):**
+  1. **`OnboardingScreen` overall progress bar (§105)** — 3 dp `LinearProgressIndicator` at top of onboarding `Column`; advances from 0 → 100% across all 6 steps.
+  2. **`TrainScreen` total adapter disk usage (§106)** — `LoraHistoryCard` header shows `totalKb = checkpoints.sumOf { it.sizeKb }` as `"X.X MB total"` in accent monospace below the adapter count.
+  3. **`DashboardScreen` last-action preview (§107)** — `"↳ {lastAction.take(60)}"` in 9 sp monospace muted font shown inside the running status block before `StepActivityBar`.
+  4. **`ControlScreen` queue estimated wait time (§108)** — `"Est. ~Nm wait (N tasks × ~2m avg)"` monospace label below queue-count chip when queue is non-empty.
+  5. **`ActivityScreen` memory search bar (§109)** — `var memSearch` + `displayEntries` filtered by app/summary; full-width `OutlinedTextField` with Search+Clear icons as second `LazyColumn item` in `MemoryList`.
+  6. **`AgentLoop` action-diversity stuck hint (§110)** — After `actionToolHistory.add(t)`, if last 3 tools are identical and `stuckHint` is blank, injects `"You called 't' three consecutive times… try a different tool"`.
+  7. **`DiagnosticsScreen` log filter bar (§111)** — `var logFilter` added; when log is expanded, `OutlinedTextField` filter bar shown first, then `visibleLines` filtered by `logFilter` replaces raw `crashLines.takeLast(40)`.
+  8. **`GoalsScreen` recently-completed count badge (§112)** — "RECENTLY COMPLETED" label wrapped in `Row` with a primary-tinted badge showing `"${recentGoals.size}"`.
+  9. **`ControlScreen` queue-goal character count (§113)** — `"N / 200"` right-aligned monospace counter below queue-goal field; Muted → Warning (≥160) → Destructive (≥200).
+  10. **`ChatScreen` scroll-to-bottom FAB (§114)** — `derivedStateOf { listState.canScrollForward }` drives a `SmallFloatingActionButton` overlaid at `BottomEnd` of the message `Box`; tap animates to latest message.
+  11. **`AgentViewModel` `lastErrorAt` + Dashboard timestamp (§115)** — `lastErrorAt: Long = 0L` added to `AgentUiState`; set to `currentTimeMillis()` on error; DashboardScreen error panel shows `"at HH:mm:ss"`.
+  12. **`GoalsScreen` Queue tab live count (§116)** — Tab label shows `"Queue (N)"` when `taskQueue.isNotEmpty()`, giving real-time task-count badge on the tab itself.
+  **Files changed:** `OnboardingScreen.kt`, `TrainScreen.kt`, `DashboardScreen.kt`, `ControlScreen.kt` (×2), `ActivityScreen.kt`, `AgentLoop.kt`, `DiagnosticsScreen.kt`, `GoalsScreen.kt` (×2), `ChatScreen.kt`, `AgentViewModel.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-02 — **Round 16 — closed GAP_AUDIT §93–§104 (12 items):**
   1. **`OnboardingScreen` step N-of-M counter (§93)** — `"Step N of M"` text added below dot indicators so users know their numeric position.
   2. **`TrainScreen` estimated samples processed (§94)** — `adamStep × 32` displayed as `"Est. samples processed: NK"` accent-coloured monospace line in `RlStatusCard`.
