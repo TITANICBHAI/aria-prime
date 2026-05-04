@@ -684,6 +684,10 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                             MemStatChip("Edge",     "${stats.edgeCase}", ARIAColors.Warning)
                             MemStatChip("Untrained","${stats.untrained}",ARIAColors.Muted)
                             MemStatChip("Avg Conf", "$avgConf%",         ARIAColors.Primary)
+                            // Round 22 §168: cumulative reward sum chip.
+                            if (stats.totalReward != 0.0) {
+                                MemStatChip("Reward", "%.1f".format(stats.totalReward), if (stats.totalReward >= 0) ARIAColors.Success else ARIAColors.Destructive)
+                            }
                         }
                     }
                 }
@@ -806,14 +810,43 @@ private fun LabelsList(labels: List<com.ariaagent.mobile.core.memory.ObjectLabel
             message = "Use the Labeler tool to annotate UI elements. Labels teach the agent about specific screens."
         )
     } else {
+        // Round 22 §169: search/filter field for the labels list.
+        var labelSearch by remember { mutableStateOf("") }
+        val displayLabels = remember(labelSearch, labels) {
+            if (labelSearch.isBlank()) labels
+            else labels.filter {
+                it.label.contains(labelSearch, ignoreCase = true) ||
+                it.objectId.contains(labelSearch, ignoreCase = true)
+            }
+        }
         LazyColumn(
             modifier        = Modifier.fillMaxSize(),
             contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Round 22 §169: search field as first item in the list.
+            item {
+                OutlinedTextField(
+                    value         = labelSearch,
+                    onValueChange = { labelSearch = it },
+                    modifier      = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    placeholder   = { Text("Search labels…", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.TextMuted, fontSize = 11.sp)) },
+                    leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) },
+                    trailingIcon  = if (labelSearch.isNotBlank()) {{ IconButton(onClick = { labelSearch = "" }) { Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) } }} else null,
+                    singleLine    = true,
+                    textStyle     = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = ARIAColors.Primary,
+                        unfocusedBorderColor = ARIAColors.Divider,
+                        focusedTextColor     = ARIAColors.OnSurface,
+                        unfocusedTextColor   = ARIAColors.OnSurface,
+                        cursorColor          = ARIAColors.Primary,
+                    ),
+                )
+            }
             // Round 19 §132: label count + enriched count header.
             item {
-                val enrichedCount = labels.count { it.isEnriched }
+                val enrichedCount = displayLabels.count { it.isEnriched }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -826,12 +859,12 @@ private fun LabelsList(labels: List<com.ariaagent.mobile.core.memory.ObjectLabel
                         )
                     )
                     Text(
-                        "${labels.size} total  •  $enrichedCount enriched",
+                        if (labelSearch.isNotBlank()) "${displayLabels.size} / ${labels.size}" else "${labels.size} total  •  $enrichedCount enriched",
                         style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp)
                     )
                 }
             }
-            items(labels, key = { it.id }) { label ->
+            items(displayLabels, key = { it.id }) { label ->
                 LabelRow(label = label)
             }
         }

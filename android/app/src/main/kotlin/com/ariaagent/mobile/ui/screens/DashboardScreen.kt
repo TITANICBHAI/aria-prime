@@ -438,7 +438,12 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
 
         // ── Session stats ─────────────────────────────────────────────────────
         if (sessionStats.tasksCompleted + sessionStats.tasksErrored > 0) {
-            SessionStatsCard(sessionStats, lastTaskDurationMs)
+            SessionStatsCard(
+                stats              = sessionStats,
+                lastTaskDurationMs = lastTaskDurationMs,
+                uptimeSeconds      = uptimeSeconds,
+                onResetSession     = { vm.resetSession() },
+            )
         }
 
         // ── Learning stats ────────────────────────────────────────────────────
@@ -475,13 +480,32 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
 // ─── Session Stats card ───────────────────────────────────────────────────────
 
 @Composable
-private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Long = 0L) {
+private fun SessionStatsCard(
+    stats: SessionStatsUiState,
+    lastTaskDurationMs: Long = 0L,
+    // Round 22 §165: live uptime seconds for Uptime chip while agent is running.
+    uptimeSeconds: Long = 0L,
+    // Round 22 §166: callback to reset session — shows Reset TextButton when wired.
+    onResetSession: (() -> Unit)? = null,
+) {
     val lastDurSec = (lastTaskDurationMs / 1_000L).toInt()
     ARIACard {
-        Text(
-            "SESSION STATS",
-            style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "SESSION STATS",
+                style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted),
+                modifier = Modifier.weight(1f),
+            )
+            // Round 22 §166: Reset session TextButton — visible when there are completed tasks.
+            if (onResetSession != null && (stats.tasksCompleted + stats.tasksErrored) > 0) {
+                TextButton(onClick = onResetSession, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)) {
+                    Text("Reset", color = ARIAColors.Muted, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
         Spacer(Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -508,6 +532,16 @@ private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Lon
             // Round 20 §145: chat message count chip.
             if (stats.chatMessagesCount > 0) {
                 SessionStat("Chat", "${stats.chatMessagesCount}")
+            }
+            // Round 22 §165: live uptime chip while agent is running.
+            if (uptimeSeconds > 0L) {
+                val m = uptimeSeconds / 60L
+                val s = uptimeSeconds % 60L
+                SessionStat("Uptime", if (m > 0L) "${m}m ${s}s" else "${s}s")
+            }
+            // Round 22 §176: loop errors chip — only shown when errors occurred.
+            if (stats.agentLoopErrors > 0) {
+                SessionStat("Loop Err", "${stats.agentLoopErrors}", valueColor = ARIAColors.Error)
             }
         }
         if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {

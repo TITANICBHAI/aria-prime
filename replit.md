@@ -161,6 +161,19 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 22 — closed GAP_AUDIT §165–§176 (12 items):**
+  1. **`DashboardScreen` SessionStatsCard `uptimeSeconds` + Uptime chip (§165)** — `uptimeSeconds: Long = 0L` param; `SessionStat("Uptime", "Xm Ys")` chip when running.
+  2. **`DashboardScreen` SessionStatsCard "Reset" TextButton (§166)** — `onResetSession: (() -> Unit)?` param; shown when `tasksCompleted + tasksErrored > 0`; calls `vm.resetSession()`.
+  3. **`DashboardScreen` "Loop Err" chip in SessionStatsCard (§167)** — `SessionStat("Loop Err", "N", Error)` when `agentLoopErrors > 0`.
+  4. **`ActivityScreen` MemoryList `totalReward` MemStatChip (§168)** — `MemStatChip("Reward", "%.1f", Success/Destructive)` appended when `totalReward != 0.0`.
+  5. **`ActivityScreen` LabelsList search filter (§169)** — `var labelSearch` + `displayLabels`; `OutlinedTextField` first in LazyColumn; `items()` updated; header count shows `"N / M"` when active.
+  6. **`ChatScreen` clear-chat dialog shows exact message count (§170)** — `"All N message(s) will be removed."` with singular/plural.
+  7. **`GoalsScreen` QueueTab estimated completion time (§171)** — `avgStepDurationMs: Long = 0L` param; `"~est. Xm Ys remaining"` 9 sp monospace shown before queue items list.
+  8. **`ControlScreen` last-error excerpt chip in status row (§172/§175)** — when `status == "error" && lastError.isNotBlank()`, red 10% alpha chip shows first 28 chars of `lastError`.
+  9. **`TrainScreen` "Share adapter" icon button (§173)** — `IconButton(Share)` in adapter filename `Row` when `sizeKb > 0`; shares via `FileProvider` + `Intent.ACTION_SEND`.
+  10. **`ModulesScreen` LlmSlotCard model filename hint (§174)** — `slotEntry?.modelId?.substringAfterLast('/')` shown as 9 sp 70% alpha Muted text before the `~N MB` chip.
+  11. **`DashboardScreen` `onResetSession` wired at call site (§176)** — `SessionStatsCard(..., uptimeSeconds, onResetSession = { vm.resetSession() })`.
+  **Files changed:** `DashboardScreen.kt` (×4), `ActivityScreen.kt` (×4), `ChatScreen.kt`, `GoalsScreen.kt` (×3), `ControlScreen.kt`, `TrainScreen.kt`, `ModulesScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 21 — closed GAP_AUDIT §153–§164 (12 items):**
   1. **`AgentViewModel` `agentLoopErrors: Int = 0` in `SessionStatsUiState` (§153)** — cumulative error counter persists across the session.
   2. **`AgentViewModel` increment `agentLoopErrors` on "error" status (§154)** — `_sessionStats.update { copy(agentLoopErrors + 1) }` inside `handleStatusChanged`.

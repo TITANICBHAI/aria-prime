@@ -692,6 +692,16 @@ private fun CatalogModelCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement   = Arrangement.spacedBy(2.dp)
                     ) {
+                        // Round 22 §174: show model filename (from modelId) as secondary hint.
+                        val modelFilename = slotEntry?.modelId?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+                        if (modelFilename != null) {
+                            Text(
+                                modelFilename,
+                                style    = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted.copy(alpha = 0.7f), fontSize = 9.sp),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
                         Text(
                             "~${catalog.displaySizeMb} MB",
                             style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted)

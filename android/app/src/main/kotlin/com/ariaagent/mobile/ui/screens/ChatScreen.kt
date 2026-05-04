@@ -107,7 +107,8 @@ fun ChatScreen(vm: AgentViewModel) {
         AlertDialog(
             onDismissRequest  = { showClearDialog = false },
             title             = { Text("Clear conversation?", color = ARIAColors.TextPrimary) },
-            text              = { Text("All messages will be removed.", color = ARIAColors.TextSecondary) },
+            // Round 22 §170: show exact message count in confirmation dialog.
+            text              = { Text("All ${messages.size} message${if (messages.size == 1) "" else "s"} will be removed.", color = ARIAColors.TextSecondary) },
             confirmButton     = {
                 TextButton(onClick = { vm.clearChat(); showClearDialog = false }) {
                     Text("Clear", color = ARIAColors.Error)

@@ -188,6 +188,24 @@ fun ControlScreen(
                     agentState.status.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
                 )
+                // Round 22 §175: show last error excerpt as a chip when agent is in error state.
+                if (agentState.status == "error" && agentState.lastError.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(ARIAColors.Error.copy(alpha = 0.10f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            agentState.lastError.take(28).trimEnd().let { if (agentState.lastError.length > 28) "$it…" else it },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color    = ARIAColors.Error,
+                                fontSize = 8.sp,
+                            ),
+                            maxLines = 1,
+                        )
+                    }
+                }
                 // Round 21 §160: show token rate chip next to status when running.
                 if (agentState.status == "running" && agentState.tokenRate > 0.0) {
                     Box(

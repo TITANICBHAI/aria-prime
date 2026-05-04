@@ -298,7 +298,12 @@ private fun RlStatusCard(
         if (!adapterPath.isNullOrBlank()) {
             val adapterFile = java.io.File(adapterPath)
             val sizeKb      = if (adapterFile.exists()) adapterFile.length() / 1024L else -1L
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            val trainCtx = LocalContext.current
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(
                     text     = adapterPath.substringAfterLast('/'),
                     color    = ARIAColors.TextMuted,
@@ -314,6 +319,29 @@ private fun RlStatusCard(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium,
                     )
+                }
+                // Round 22 §173: share adapter file via system share sheet.
+                if (sizeKb > 0L) {
+                    IconButton(
+                        onClick = {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                trainCtx,
+                                "${trainCtx.packageName}.provider",
+                                adapterFile,
+                            )
+                            trainCtx.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type  = "application/octet-stream"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "ARIA LoRA Adapter")
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }.let { android.content.Intent.createChooser(it, "Share adapter") }
+                            )
+                        },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share adapter", tint = ARIAColors.Primary, modifier = Modifier.size(16.dp))
+                    }
                 }
             }
         }

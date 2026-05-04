@@ -84,6 +84,8 @@ fun GoalsScreen(
 ) {
     val taskQueue    by vm.taskQueue.collectAsStateWithLifecycle()
     val recentGoals  by vm.recentGoals.collectAsStateWithLifecycle()
+    // Round 22 §171: collect sessionStats so we can pass avgStepDurationMs to QueueTab.
+    val sessionStats by vm.sessionStats.collectAsState()
     val focusManager = LocalFocusManager.current
 
     var activeTab      by remember { mutableStateOf(GoalsTab.Queue) }
@@ -204,6 +206,8 @@ fun GoalsScreen(
                 },
                 onRemove      = { vm.removeQueuedTask(it) },
                 onClearAll    = { vm.clearTaskQueue() },
+                // Round 22 §171: pass avg step duration for estimated completion display.
+                avgStepDurationMs = sessionStats.avgStepDurationMs,
             )
             GoalsTab.Templates -> TemplatesTab(
                 recentGoals = recentGoals,
@@ -233,6 +237,8 @@ private fun QueueTab(
     onRemove: (String) -> Unit,
     // Round 19 §131: clear-all callback — null means not wired (safe default).
     onClearAll: (() -> Unit)? = null,
+    // Round 22 §171: avg step duration for estimated completion time display.
+    avgStepDurationMs: Long = 0L,
 ) {
     LazyColumn(
         modifier        = Modifier.fillMaxSize(),
@@ -298,6 +304,24 @@ private fun QueueTab(
                     }
                 }
             }
+            // Round 22 §171: estimated completion time based on avg step duration.
+            if (avgStepDurationMs > 0L && taskQueue.isNotEmpty()) {
+                item {
+                    val estMs  = taskQueue.size.toLong() * avgStepDurationMs * 10L
+                    val estMin = estMs / 60_000L
+                    val estSec = (estMs % 60_000L) / 1_000L
+                    Text(
+                        "~est. ${if (estMin > 0L) "${estMin}m " else ""}${estSec}s remaining",
+                        style    = MaterialTheme.typography.labelSmall.copy(
+                            color      = ARIAColors.Muted,
+                            fontSize   = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                        ),
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+            }
+
             items(taskQueue, key = { it.id }) { task ->
                 QueueTaskRow(task = task, onRemove = { onRemove(task.id) })
             }
