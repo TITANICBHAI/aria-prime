@@ -126,7 +126,13 @@ fun SafetyScreen(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("SAFETY BOUNDARIES", style = MaterialTheme.typography.titleLarge.copy(color = ARIAColors.Destructive, fontWeight = FontWeight.Bold))
-                    Text("Control what ARIA can and cannot do", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted))
+                    // Round 20 §149: show total blocked-package count in header subtitle.
+                    val totalBlocked = safetyConfig.blockedPackages.size
+                    Text(
+                        if (totalBlocked > 0) "$totalBlocked app${if (totalBlocked == 1) "" else "s"} blocked"
+                        else "Control what ARIA can and cannot do",
+                        style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+                    )
                 }
             }
         }

@@ -100,6 +100,22 @@ fun ModulesScreen(
                 )
             )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Round 20 §148: skills count chip in screen header.
+                if (appSkills.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ARIAColors.Accent.copy(alpha = 0.10f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "${appSkills.size} skills",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Accent, fontWeight = FontWeight.Bold, fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
                 // Round 19 §133: loaded-model count chip in screen header.
                 val hdrLoaded = loadedLlms.values.count { it.isLoaded }
                 if (loadedLlms.isNotEmpty()) {

@@ -442,6 +442,19 @@ private fun ActionsList(logs: List<ActionLogEntry>) {
             textStyle     = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
         )
 
+        // Round 20 §143: match count label below search field when there are results.
+        if (actionSearch.isNotBlank() && filtered.isNotEmpty()) {
+            Text(
+                "${filtered.size} match${if (filtered.size == 1) "" else "es"} for \"$actionSearch\"",
+                style    = MaterialTheme.typography.labelSmall.copy(
+                    color    = ARIAColors.Muted,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                ),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+        }
+
         if (filtered.isEmpty()) {
             EmptyState(
                 icon    = Icons.Default.Timeline,

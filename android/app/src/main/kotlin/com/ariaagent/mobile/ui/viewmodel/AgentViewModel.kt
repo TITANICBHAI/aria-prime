@@ -338,6 +338,8 @@ data class SessionStatsUiState(
     val sessionStartMs: Long     = System.currentTimeMillis(),
     val avgStepDurationMs: Long  = 0L,  // Round 11: running avg of full observe→act latency
     val inferenceTimeoutCount: Int = 0, // Round 12: cumulative LLM inference timeouts this session
+    // Round 20 §144: total user chat messages sent this session.
+    val chatMessagesCount: Int   = 0,
 ) {
     val successRate: Float
         get() = if (tasksCompleted + tasksErrored == 0) 0f
@@ -2300,6 +2302,8 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             text = text,
         )
         _chatMessages.update { prev -> prev + userMsg }
+        // Round 20 §150: track user chat messages in session stats.
+        _sessionStats.update { it.copy(chatMessagesCount = it.chatMessagesCount + 1) }
         _chatThinking.value = true
 
         viewModelScope.launch(Dispatchers.IO) {

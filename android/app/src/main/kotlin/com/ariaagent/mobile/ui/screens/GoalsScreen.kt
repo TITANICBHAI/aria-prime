@@ -550,8 +550,17 @@ private fun TemplatesTab(
             ),
         )
 
+        // Round 20 §142: filter recently-completed goals by the same searchQuery that filters templates.
+        val filteredRecentGoals = remember(searchQuery, recentGoals) {
+            if (searchQuery.isBlank()) recentGoals
+            else recentGoals.filter {
+                it.goal.contains(searchQuery, ignoreCase = true) ||
+                it.appPackage.contains(searchQuery, ignoreCase = true)
+            }
+        }
+
         // ── Recently completed (only shown when the agent has finished at least one task) ──
-        if (recentGoals.isNotEmpty()) {
+        if (filteredRecentGoals.isNotEmpty()) {
             Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
                 Row(
                     verticalAlignment     = Alignment.CenterVertically,
@@ -587,7 +596,8 @@ private fun TemplatesTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(end = 4.dp),
                 ) {
-                    androidx.compose.foundation.lazy.items(recentGoals) { recent ->
+                    // Round 20 §142: use filteredRecentGoals so searchQuery applies here too.
+                    androidx.compose.foundation.lazy.items(filteredRecentGoals) { recent ->
                         RecentGoalChip(
                             recent = recent,
                             onClick = {
@@ -720,6 +730,16 @@ private fun TriggersTab(vm: AgentViewModel) {
     var minuteStr     by remember { mutableStateOf("00") }
     var dayOfWeek     by remember { mutableIntStateOf(2) }
     var deleteConfirm by remember { mutableStateOf<String?>(null) }
+    // Round 20 §147: search/filter field for the trigger list.
+    var triggerSearch by remember { mutableStateOf("") }
+    val filteredTriggers = remember(triggerSearch, triggers) {
+        if (triggerSearch.isBlank()) triggers
+        else triggers.filter {
+            it.goal.contains(triggerSearch, ignoreCase = true) ||
+            it.watchPackage.contains(triggerSearch, ignoreCase = true) ||
+            it.goalAppPackage.contains(triggerSearch, ignoreCase = true)
+        }
+    }
 
     // Bug #9 fix: capture a stable local val — dismiss sets deleteConfirm = null and a
     // concurrent recomposition would crash on the !! dereference inside the dialog lambdas.
@@ -745,6 +765,29 @@ private fun TriggersTab(vm: AgentViewModel) {
         contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+
+        // Round 20 §147: search field to filter existing triggers by goal or app.
+        if (triggers.size > 1) {
+            item {
+                OutlinedTextField(
+                    value         = triggerSearch,
+                    onValueChange = { triggerSearch = it },
+                    modifier      = Modifier.fillMaxWidth(),
+                    placeholder   = { Text("Search triggers…", style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted, fontSize = 11.sp)) },
+                    leadingIcon   = { Icon(Icons.Default.Search, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) },
+                    trailingIcon  = if (triggerSearch.isNotBlank()) {{ IconButton(onClick = { triggerSearch = "" }) { Icon(Icons.Default.Clear, null, tint = ARIAColors.Muted, modifier = Modifier.size(15.dp)) } }} else null,
+                    singleLine    = true,
+                    textStyle     = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = ARIAColors.Primary,
+                        unfocusedBorderColor = ARIAColors.Divider,
+                        focusedTextColor     = ARIAColors.OnSurface,
+                        unfocusedTextColor   = ARIAColors.OnSurface,
+                        cursorColor          = ARIAColors.Primary,
+                    ),
+                )
+            }
+        }
 
         // ── Create trigger card ────────────────────────────────────────────────
         item {
@@ -1014,7 +1057,7 @@ private fun TriggersTab(vm: AgentViewModel) {
                     }
                 }
             }
-            items(triggers, key = { it.id }) { trigger ->
+            items(filteredTriggers, key = { it.id }) { trigger ->
                 TriggerRow(
                     trigger   = trigger,
                     onToggle  = { vm.toggleTrigger(trigger.id) },

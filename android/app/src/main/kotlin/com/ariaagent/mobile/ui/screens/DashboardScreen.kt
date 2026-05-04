@@ -216,6 +216,19 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                 StepActivityBar(activity = stepState.activity, stepNumber = stepState.stepNumber)
             }
 
+            // Round 20 §141: "Last task" preview line when agent is idle.
+            if (agentState.status == "idle" && agentState.lastCompletedGoal.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Last: ${agentState.lastCompletedGoal.take(55)}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color      = ARIAColors.Muted,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize   = 9.sp,
+                    ),
+                )
+            }
+
             // Round 15 §85: quick-action strip shown only on error — retry or dismiss.
             if (agentState.status == "error") {
                 Spacer(Modifier.height(10.dp))
@@ -486,6 +499,10 @@ private fun SessionStatsCard(stats: SessionStatsUiState, lastTaskDurationMs: Lon
             // Round 18 §128: inference-timeout count chip — warning tint when > 0.
             if (stats.inferenceTimeoutCount > 0) {
                 SessionStat("Timeouts", "${stats.inferenceTimeoutCount}", valueColor = ARIAColors.Warning)
+            }
+            // Round 20 §145: chat message count chip.
+            if (stats.chatMessagesCount > 0) {
+                SessionStat("Chat", "${stats.chatMessagesCount}")
             }
         }
         if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {

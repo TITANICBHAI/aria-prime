@@ -363,16 +363,38 @@ fun DiagnosticsScreen(
                             style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
                         )
                         if (crashLines.isNotEmpty()) {
-                            TextButton(
-                                onClick = { logExpanded = !logExpanded },
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    if (logExpanded) "Collapse" else "Expand",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = ARIAColors.Primary
+                            Row(horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
+                                // Round 20 §146: share full app.log via the system share sheet.
+                                val shareLogCtx = LocalContext.current
+                                IconButton(
+                                    onClick = {
+                                        val text = crashLines.joinToString("\n")
+                                        shareLogCtx.startActivity(
+                                            Intent.createChooser(
+                                                Intent(Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(Intent.EXTRA_TEXT, text)
+                                                    putExtra(Intent.EXTRA_SUBJECT, "ARIA App Log")
+                                                },
+                                                "Share App Log"
+                                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                        )
+                                    },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, "Share log", tint = ARIAColors.Muted, modifier = Modifier.size(14.dp))
+                                }
+                                TextButton(
+                                    onClick = { logExpanded = !logExpanded },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        if (logExpanded) "Collapse" else "Expand",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = ARIAColors.Primary
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }

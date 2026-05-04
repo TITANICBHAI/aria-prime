@@ -161,6 +161,20 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 20 — closed GAP_AUDIT §141–§152 (12 items):**
+  1. **`DashboardScreen` "Last task" preview when idle (§141)** — 9 sp monospace `"Last: {goal.take(55)}"` shown below status card when idle + lastCompletedGoal set.
+  2. **`GoalsScreen` TemplatesTab filter recentGoals by searchQuery (§142)** — `filteredRecentGoals` via `remember(searchQuery, recentGoals)`; both `if()` guard and `items(...)` use filtered list.
+  3. **`ActivityScreen` action-search match count label (§143)** — `"N match(es) for 'X'"` Muted monospace 9 sp below search field when results non-empty.
+  4. **`AgentViewModel` `chatMessagesCount` in `SessionStatsUiState` (§144)** — `val chatMessagesCount: Int = 0` added to `SessionStatsUiState`.
+  5. **`DashboardScreen` SessionStatsCard "Chat" chip (§145)** — `SessionStat("Chat", "N")` chip when `chatMessagesCount > 0`.
+  6. **`DiagnosticsScreen` "Share app.log" icon button (§146)** — `IconButton(Share)` added alongside Expand/Collapse button in log card header; shares `crashLines.joinToString("\n")` via `ACTION_SEND`.
+  7. **`GoalsScreen` TriggersTab search filter (§147)** — `var triggerSearch` + `filteredTriggers` (by `goal`/`watchPackage`/`goalAppPackage`); search `OutlinedTextField` as first LazyColumn item when `triggers.size > 1`; `items()` updated.
+  8. **`ModulesScreen` skills count chip in header (§148)** — `"${appSkills.size} skills"` Accent chip added left of the loaded-model chip.
+  9. **`SafetyScreen` blocked-package count in header subtitle (§149)** — `"N app(s) blocked"` replaces default subtitle when `safetyConfig.blockedPackages.size > 0`.
+  10. **`AgentViewModel` `sendChatMessage` increments `chatMessagesCount` (§150)** — `_sessionStats.update { it.copy(chatMessagesCount + 1) }` after `_chatMessages.update`.
+  11. **`TrainScreen` RlStatusCard "N training steps" summary (§151)** — `"Nk training steps  •  policy ready/pending"` in 9 sp monospace below StatBadge row; color Success/Accent based on policyReady.
+  12. **`ChatScreen` input character count label (§152)** — `ChatInputBar` wraps `OutlinedTextField` in `Column(weight(1f))`; right-aligned 9 sp `"N chars"` below field when `> 100`; Warning tint when `> 400`.
+  **Files changed:** `DashboardScreen.kt` (×2), `GoalsScreen.kt` (×5), `ActivityScreen.kt`, `AgentViewModel.kt` (×3), `DiagnosticsScreen.kt`, `ModulesScreen.kt`, `SafetyScreen.kt`, `TrainScreen.kt`, `ChatScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 19 — closed GAP_AUDIT §129–§140 (12 items):**
   1. **`ChatHeader` message count badge (§129)** — `messageCount: Int = 0` param; primary-tinted badge next to title when `messageCount > 1`.
   2. **`TrainScreen` RlStatusCard loss color (§130)** — Policy-loss text: green < 0.05, amber < 0.30, red ≥ 0.30; `SemiBold`.

@@ -556,28 +556,41 @@ private fun ChatInputBar(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
-            value         = input,
-            onValueChange = onInput,
-            modifier      = Modifier.weight(1f),
-            placeholder   = {
+        Column(modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value         = input,
+                onValueChange = onInput,
+                modifier      = Modifier.fillMaxWidth(),
+                placeholder   = {
+                    Text(
+                        if (llmLoaded) "Ask ARIA anything…" else "Load the LLM first (Control tab)",
+                        color    = ARIAColors.TextMuted,
+                        fontSize = 14.sp,
+                    )
+                },
+                enabled       = !thinking,
+                maxLines      = 4,
+                textStyle     = LocalTextStyle.current.copy(color = ARIAColors.TextPrimary, fontSize = 14.sp),
+                shape         = RoundedCornerShape(24.dp),
+                colors        = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = ARIAColors.Primary,
+                    unfocusedBorderColor = ARIAColors.Surface3,
+                    focusedContainerColor   = ARIAColors.Surface1,
+                    unfocusedContainerColor = ARIAColors.Surface1,
+                ),
+            )
+            // Round 20 §152: character count label when input is getting long.
+            if (input.length > 100) {
                 Text(
-                    if (llmLoaded) "Ask ARIA anything…" else "Load the LLM first (Control tab)",
-                    color    = ARIAColors.TextMuted,
-                    fontSize = 14.sp,
+                    "${input.length} chars",
+                    style    = MaterialTheme.typography.labelSmall.copy(
+                        color    = if (input.length > 400) ARIAColors.Warning else ARIAColors.Muted,
+                        fontSize = 9.sp,
+                    ),
+                    modifier = Modifier.align(Alignment.End).padding(end = 4.dp, top = 2.dp),
                 )
-            },
-            enabled       = !thinking,
-            maxLines      = 4,
-            textStyle     = LocalTextStyle.current.copy(color = ARIAColors.TextPrimary, fontSize = 14.sp),
-            shape         = RoundedCornerShape(24.dp),
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = ARIAColors.Primary,
-                unfocusedBorderColor = ARIAColors.Surface3,
-                focusedContainerColor   = ARIAColors.Surface1,
-                unfocusedContainerColor = ARIAColors.Surface1,
-            ),
-        )
+            }
+        }
         Box(
             modifier = Modifier
                 .size(44.dp)

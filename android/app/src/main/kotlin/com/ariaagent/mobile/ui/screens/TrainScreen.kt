@@ -279,6 +279,19 @@ private fun RlStatusCard(
             )
         }
 
+        // Round 20 §151: "N training steps" summary below the StatBadge row.
+        if ((status?.adamStep ?: 0) > 0) {
+            val steps = status!!.adamStep
+            Text(
+                "${if (steps >= 1_000) "${steps / 1_000}K" else "$steps"} training steps  •  ${if (status.policyReady) "policy ready" else "policy pending"}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color      = if (status.policyReady) ARIAColors.Success else ARIAColors.Accent,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize   = 9.sp,
+                ),
+            )
+        }
+
         // Bug #7 fix: capture stable local val before the null check so a concurrent
         // recomposition setting status = null can't cause a NullPointerException on !!
         val adapterPath = status?.latestAdapterPath
