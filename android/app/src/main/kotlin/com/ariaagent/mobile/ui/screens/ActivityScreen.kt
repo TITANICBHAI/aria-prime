@@ -776,6 +776,26 @@ private fun LabelsList(labels: List<com.ariaagent.mobile.core.memory.ObjectLabel
             contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Round 19 §132: label count + enriched count header.
+            item {
+                val enrichedCount = labels.count { it.isEnriched }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "LABELS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                        )
+                    )
+                    Text(
+                        "${labels.size} total  •  $enrichedCount enriched",
+                        style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp)
+                    )
+                }
+            }
             items(labels, key = { it.id }) { label ->
                 LabelRow(label = label)
             }

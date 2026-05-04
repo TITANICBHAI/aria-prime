@@ -161,6 +161,20 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 19 — closed GAP_AUDIT §129–§140 (12 items):**
+  1. **`ChatHeader` message count badge (§129)** — `messageCount: Int = 0` param; primary-tinted badge next to title when `messageCount > 1`.
+  2. **`TrainScreen` RlStatusCard loss color (§130)** — Policy-loss text: green < 0.05, amber < 0.30, red ≥ 0.30; `SemiBold`.
+  3. **`GoalsScreen` QueueTab "Clear All" button (§131)** — `onClearAll` param added; destructive `TextButton` in NEXT UP row when queue non-empty.
+  4. **`ActivityScreen` LabelsList count + enriched header (§132)** — First `item` shows `"LABELS"` + `"N total • M enriched"` in a `SpaceBetween` Row.
+  5. **`ModulesScreen` loaded model chip in header (§133)** — `"N / M loaded"` primary chip in header row when `loadedLlms.isNotEmpty()`.
+  6. **`AgentViewModel` `lastCompletedGoal` field (§134)** — Added to `AgentUiState`; set in `handleStatusChanged` when task transitions running→done/idle.
+  7. **`ControlScreen` "Run again" quick chip (§135)** — Full-width `TextButton` with `Replay` icon pre-fills `goalText` when idle + goal blank + lastCompletedGoal set.
+  8. **`DiagnosticsScreen` ERROR/WARN count above filter bar (§136)** — `"N ERR"` (red) / `"M WARN"` (amber) labels above the log filter field when log is expanded.
+  9. **`GoalsScreen` QueueTab `"NEXT UP (N)"` count header (§137)** — `"NEXT UP"` becomes `"NEXT UP  (N)"` in a `SpaceBetween` Row with the Clear All button.
+  10. **`TrainScreen` IRL LLM-assist rate % (§138)** — `"N% LLM-labelled"` in primary 80% alpha monospace when `tuplesExtracted > 0 && llmAssistedCount > 0`.
+  11. **`ControlScreen` running-task banner shows target app (§139)** — `currentApp.substringAfterLast('.')` rendered in banner-tint 9 sp monospace below task text.
+  12. **`TrainScreen` LoRA version "v" prefix (§140)** — `StatBadge` shows `"v{N}"` when adapter exists, plain number otherwise.
+  **Files changed:** `ChatScreen.kt` (×3), `TrainScreen.kt` (×3), `GoalsScreen.kt` (×3), `ActivityScreen.kt`, `ModulesScreen.kt`, `AgentViewModel.kt` (×2), `ControlScreen.kt` (×2), `DiagnosticsScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 18 — closed GAP_AUDIT §117–§128 (12 items):**
   1. **`ControlScreen` running-task banner (§117)** — When `!isIdle && currentTask.isNotBlank()`, a tinted pill-row (green/red/amber dot + truncated task text) renders below hardware meters card.
   2. **`ActivityScreen` action-log search state (§118)** — `var actionSearch` added to `ActionsList`; `filtered` now trims by `tool` or `nodeId` containment when non-blank.

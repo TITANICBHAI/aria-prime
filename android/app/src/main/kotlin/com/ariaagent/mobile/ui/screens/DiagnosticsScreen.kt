@@ -377,6 +377,20 @@ fun DiagnosticsScreen(
                         }
                     }
                     if (logExpanded && crashLines.isNotEmpty()) {
+                        // Round 19 §136: quick ERROR / WARN count above the filter bar.
+                        val errCount  = crashLines.count { "E/" in it || it.contains("ERROR", ignoreCase = true) }
+                        val warnCount = crashLines.count { "W/" in it || it.contains("WARN",  ignoreCase = true) }
+                        if (errCount > 0 || warnCount > 0) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            ) {
+                                if (errCount > 0)
+                                    Text("$errCount ERR",  style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Error,   fontFamily = FontFamily.Monospace, fontSize = 9.sp))
+                                if (warnCount > 0)
+                                    Text("$warnCount WARN", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Warning, fontFamily = FontFamily.Monospace, fontSize = 9.sp))
+                            }
+                        }
                         // Round 17 §111: filter bar + filtered log display.
                         OutlinedTextField(
                             value         = logFilter,

@@ -122,6 +122,7 @@ fun ChatScreen(vm: AgentViewModel) {
             llmLoaded     = llmLoaded,
             contextLine   = contextLine,
             hasMessages   = messages.size > 1,
+            messageCount  = messages.size,
             onClear       = { showClearDialog = true },
         )
 
@@ -214,6 +215,7 @@ private fun ChatHeader(
     llmLoaded: Boolean,
     contextLine: String?,
     hasMessages: Boolean,
+    messageCount: Int = 0,
     onClear: () -> Unit,
 ) {
     Row(
@@ -235,12 +237,32 @@ private fun ChatHeader(
                 Text("⚡", fontSize = 16.sp)
             }
             Column {
-                Text(
-                    text       = "Chat with ARIA",
-                    color      = ARIAColors.TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 17.sp,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text       = "Chat with ARIA",
+                        color      = ARIAColors.TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 17.sp,
+                    )
+                    // Round 19 §129: live message count badge in the chat header.
+                    if (messageCount > 1) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(ARIAColors.Primary.copy(alpha = 0.12f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                "$messageCount",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color      = ARIAColors.Primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize   = 9.sp,
+                                )
+                            )
+                        }
+                    }
+                }
                 Text(
                     text     = contextLine ?: if (llmLoaded) "LLM ready · context injected" else "LLM not loaded",
                     color    = ARIAColors.TextMuted,

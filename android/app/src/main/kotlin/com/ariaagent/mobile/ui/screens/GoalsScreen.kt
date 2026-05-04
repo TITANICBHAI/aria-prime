@@ -203,6 +203,7 @@ fun GoalsScreen(
                     }
                 },
                 onRemove      = { vm.removeQueuedTask(it) },
+                onClearAll    = { vm.clearTaskQueue() },
             )
             GoalsTab.Templates -> TemplatesTab(
                 recentGoals = recentGoals,
@@ -230,6 +231,8 @@ private fun QueueTab(
     onPriorityChange: (Int) -> Unit,
     onEnqueue: () -> Unit,
     onRemove: (String) -> Unit,
+    // Round 19 §131: clear-all callback — null means not wired (safe default).
+    onClearAll: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier        = Modifier.fillMaxSize(),
@@ -267,10 +270,33 @@ private fun QueueTab(
             }
         } else {
             item {
-                Text(
-                    "NEXT UP",
-                    style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
-                )
+                // Round 19 §137: include live task count + §131 Clear All button in "NEXT UP" row.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "NEXT UP  (${taskQueue.size})",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                        )
+                    )
+                    if (onClearAll != null) {
+                        TextButton(
+                            onClick = onClearAll,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                        ) {
+                            Text(
+                                "Clear all",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color    = ARIAColors.Destructive,
+                                    fontSize = 10.sp,
+                                )
+                            )
+                        }
+                    }
+                }
             }
             items(taskQueue, key = { it.id }) { task ->
                 QueueTaskRow(task = task, onRemove = { onRemove(task.id) })

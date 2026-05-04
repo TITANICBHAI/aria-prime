@@ -99,7 +99,24 @@ fun ModulesScreen(
                     fontWeight = FontWeight.Bold
                 )
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Round 19 §133: loaded-model count chip in screen header.
+                val hdrLoaded = loadedLlms.values.count { it.isLoaded }
+                if (loadedLlms.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ARIAColors.Primary.copy(alpha = 0.11f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "$hdrLoaded / ${loadedLlms.size} loaded",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = ARIAColors.Primary, fontWeight = FontWeight.Bold, fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
                 IconButton(onClick = { vm.refreshAppSkills() }) {
                     Icon(Icons.Default.Psychology, contentDescription = "Refresh skills",
                         tint = ARIAColors.Muted, modifier = Modifier.size(20.dp))

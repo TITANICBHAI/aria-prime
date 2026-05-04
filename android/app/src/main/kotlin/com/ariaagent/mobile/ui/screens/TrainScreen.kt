@@ -256,9 +256,12 @@ private fun RlStatusCard(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // Round 19 §140: prefix version number with "v" when an adapter exists.
             StatBadge(
                 label  = "LoRA Version",
-                value  = status?.loraVersion?.toString() ?: "—",
+                value  = if (status?.adapterExists == true && (status.loraVersion) > 0)
+                             "v${status.loraVersion}"
+                         else status?.loraVersion?.toString() ?: "—",
                 accent = status?.adapterExists == true,
                 modifier = Modifier.weight(1f),
             )
@@ -292,7 +295,13 @@ private fun RlStatusCard(
             val estimatedSamples = status.adamStep.toLong() * 32L
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Adam step: ${status.adamStep}", color = ARIAColors.TextMuted, fontSize = 11.sp)
-                Text("Policy loss: %.4f".format(status.lastPolicyLoss), color = ARIAColors.TextMuted, fontSize = 11.sp)
+                // Round 19 §130: color loss value by severity (green=good, yellow=ok, red=high).
+                val lossColor = when {
+                    status.lastPolicyLoss < 0.05 -> ARIAColors.Success
+                    status.lastPolicyLoss < 0.30 -> ARIAColors.Warning
+                    else                         -> ARIAColors.Error
+                }
+                Text("Policy loss: %.4f".format(status.lastPolicyLoss), color = lossColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
             // Round 16 §94: estimated samples processed (adamStep × default batch size 32).
             Text(
@@ -538,6 +547,16 @@ private fun IrlCard(
                         Text(
                             "${"%.0f".format(result.tuplesExtracted * 100.0 / result.framesProcessed)}% extraction yield",
                             color      = ARIAColors.Accent,
+                            fontSize   = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                    // Round 19 §138: LLM-assist rate as a percentage of total tuples.
+                    if (result.tuplesExtracted > 0 && result.llmAssistedCount > 0) {
+                        val assistPct = result.llmAssistedCount * 100 / result.tuplesExtracted
+                        Text(
+                            "$assistPct% LLM-labelled",
+                            color      = ARIAColors.Primary.copy(alpha = 0.8f),
                             fontSize   = 10.sp,
                             fontFamily = FontFamily.Monospace,
                         )

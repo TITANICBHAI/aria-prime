@@ -213,15 +213,53 @@ fun ControlScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(bannerTint))
-                Text(
-                    agentState.currentTask.take(58),
-                    style    = MaterialTheme.typography.labelSmall.copy(
-                        color    = ARIAColors.OnSurface,
-                        fontSize = 11.sp,
-                    ),
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        agentState.currentTask.take(58),
+                        style    = MaterialTheme.typography.labelSmall.copy(
+                            color    = ARIAColors.OnSurface,
+                            fontSize = 11.sp,
+                        ),
+                        maxLines = 1,
+                    )
+                    // Round 19 §139: show target-app package as a secondary line in the banner.
+                    if (agentState.currentApp.isNotBlank()) {
+                        Text(
+                            agentState.currentApp.substringAfterLast('.'),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color      = bannerTint,
+                                fontSize   = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Round 19 §135: "Run again" quick chip — pre-fills the goal field with the last completed task.
+        if (isIdle && agentState.lastCompletedGoal.isNotBlank() && goalText.isBlank()) {
+            TextButton(
+                onClick  = { goalText = agentState.lastCompletedGoal },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Replay, null, tint = ARIAColors.Primary, modifier = Modifier.size(12.dp))
+                    Text(
+                        "↩ Run again: ${agentState.lastCompletedGoal.take(45)}",
+                        style    = MaterialTheme.typography.labelSmall.copy(
+                            color    = ARIAColors.Primary,
+                            fontSize = 11.sp,
+                        ),
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 

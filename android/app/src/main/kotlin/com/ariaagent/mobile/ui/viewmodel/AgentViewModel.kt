@@ -80,6 +80,8 @@ data class AgentUiState(
     val modelLoaded: Boolean         = false,
     val accessibilityActive: Boolean = false,
     val screenCaptureActive: Boolean = false,
+    // Round 19 §134: last successfully completed goal — used by ControlScreen "Run again" chip.
+    val lastCompletedGoal: String    = "",
 )
 
 data class ActionLogEntry(
@@ -837,6 +839,12 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
             // Round 17 §115: record timestamp when an error occurs for Dashboard display.
             lastErrorAt = if (status == "error") System.currentTimeMillis() else prev.lastErrorAt,
             gameMode    = data["gameMode"]    as? String ?: prev.gameMode,
+            // Round 19 §134: persist the completed task so ControlScreen can offer "Run again".
+            lastCompletedGoal = if ((status == "idle" || status == "done") &&
+                                     prevState.status == "running" &&
+                                     prevState.currentTask.isNotBlank())
+                                    prevState.currentTask
+                                else prev.lastCompletedGoal,
         )}
         if (status == "idle" || status == "done" || status == "error") {
             _streamBuffer.value = ""
