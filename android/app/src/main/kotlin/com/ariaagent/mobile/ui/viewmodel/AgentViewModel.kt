@@ -342,6 +342,8 @@ data class SessionStatsUiState(
     val chatMessagesCount: Int   = 0,
     // Round 21 §153: cumulative agent-loop errors this session.
     val agentLoopErrors: Int     = 0,
+    // Round 24 §191: total tokens generated across all inference calls this session.
+    val totalSessionTokens: Long = 0L,
 ) {
     val successRate: Float
         get() = if (tasksCompleted + tasksErrored == 0) 0f
@@ -673,6 +675,9 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
     // to "idle"/"done". GoalsScreen.TemplatesTab surfaces them for one-tap re-run.
     private val _recentGoals = MutableStateFlow<List<RecentGoalItem>>(emptyList())
     val recentGoals: StateFlow<List<RecentGoalItem>> = _recentGoals.asStateFlow()
+
+    /** Round 24 §196: clears the recently-completed goals list. */
+    fun clearRecentGoals() { _recentGoals.value = emptyList() }
 
     // ── Round 8: session-level performance stats ──────────────────────────────
     // Counts tasks completed/errored and total steps taken since app launch.
@@ -2314,7 +2319,9 @@ class AgentViewModel(app: Application) : AndroidViewModel(app) {
         )
         _chatMessages.update { prev -> prev + userMsg }
         // Round 20 §150: track user chat messages in session stats.
-        _sessionStats.update { it.copy(chatMessagesCount = it.chatMessagesCount + 1) }
+        // Round 24 §191: estimate input token count (word count × 1.3 approximation).
+        val inputTokenEst = (text.split(" ").size * 1.3).toLong().coerceAtLeast(1L)
+        _sessionStats.update { it.copy(chatMessagesCount = it.chatMessagesCount + 1, totalSessionTokens = it.totalSessionTokens + inputTokenEst) }
         _chatThinking.value = true
 
         viewModelScope.launch(Dispatchers.IO) {

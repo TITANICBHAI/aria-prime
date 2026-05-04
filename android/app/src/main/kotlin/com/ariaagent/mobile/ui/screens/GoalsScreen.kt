@@ -304,6 +304,24 @@ private fun QueueTab(
                     }
                 }
             }
+            // Round 24 §199: drag-to-reorder hint text when queue has multiple items.
+            if (taskQueue.size > 1) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.DragHandle, null, tint = ARIAColors.Muted, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Tap goals above to edit priority order",
+                            style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp),
+                        )
+                    }
+                }
+            }
+
             // Round 23 §181: "Share queue" chip to export task list as plain text.
             if (taskQueue.isNotEmpty()) {
                 item {

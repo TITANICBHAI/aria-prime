@@ -161,6 +161,19 @@ server/              Python preview server for the Replit workspace
   11. **`ControlScreen` metered network warning (§91)** — `networkType` StateFlow collected; amber banner with `SignalCellularAlt` shown when on `"mobile"` data and agent is idle.
   12. **`AgentViewModel.exportMemory()` (§92)** — Serialises `_memoryEntries` to JSON (app/summary/result/reward/taskType/isEdgeCase); shares via `Intent.ACTION_SEND` with `FLAG_ACTIVITY_NEW_TASK`.
   **Files changed:** `AgentLoop.kt`, `AgentViewModel.kt`, `ChatScreen.kt`, `GoalsScreen.kt`, `DashboardScreen.kt`, `DiagnosticsScreen.kt`, `ActivityScreen.kt`, `SettingsScreen.kt`, `ControlScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
+- 2026-05-04 — **Round 24 — closed GAP_AUDIT §189–§200 (12 items):**
+  1. **`ChatScreen` "Export chat" share button (§189)** — TextButton + Share icon below ContextTagBar when `messages.size > 1`; shares all messages as "You: / ARIA:" plain text.
+  2. **`ActivityScreen` MemoryList sort-by-reward FilterChip (§190)** — `var sortByReward` state + `FilterChip("↑ Reward"/"Recent")` in the chips Row; Success color when selected.
+  3. **`AgentViewModel` `totalSessionTokens` in `SessionStatsUiState` + increment (§191)** — `val totalSessionTokens: Long = 0L` added; incremented by word-count × 1.3 estimate in `sendChatMessage`.
+  4. **`DashboardScreen` session tokens chip in SessionStatsCard (§192)** — `SessionStat("Tokens", "NK tok")` chip when `totalSessionTokens > 0`.
+  5. **`ControlScreen` "Paste from clipboard" quick-fill button (§193)** — TextButton(ContentPaste + "Paste: prefix…") after goalText field when idle and clipboard has non-empty different text.
+  6. **`ActivityScreen` ReplayList sessions + steps header chip (§195)** — `val totalReplaySteps = sessions.sumOf { it.stepCount }`; Primary-tinted "N session(s) · M total step(s)" Row shown as first LazyColumn item.
+  7. **`AgentViewModel.clearRecentGoals()` (§196)** — `fun clearRecentGoals() { _recentGoals.value = emptyList() }` added next to `recentGoals` StateFlow.
+  8. **`ControlScreen` "Clear history" button in RECENT GOALS row (§197)** — RECENT GOALS label wrapped in `Row(SpaceBetween)` with trailing `TextButton("Clear")` calling `vm.clearRecentGoals()`.
+  9. **`SafetyScreen` "Copy blocklist" clipboard button (§198)** — TextButton with ContentCopy/CheckCircle icon copies `blockedPackages.joinToString("\n")` to clipboard; shows "Copied!" on success.
+  10. **`GoalsScreen` QueueTab drag-to-reorder hint text (§199)** — Centered `Row(DragHandle icon + "Tap goals above to edit priority order")` hint when `taskQueue.size > 1`.
+  11. **`DiagnosticsScreen` "Copy log" icon button (§200)** — `IconButton(ContentCopy/CheckCircle)` in the log header Row copies full log to clipboard when `progressLog.isNotBlank()`.
+  **Files changed:** `ChatScreen.kt`, `ActivityScreen.kt` (×2), `AgentViewModel.kt` (×3), `DashboardScreen.kt`, `ControlScreen.kt` (×2), `SafetyScreen.kt`, `GoalsScreen.kt`, `DiagnosticsScreen.kt`, `GAP_AUDIT.md`, `replit.md`.
 - 2026-05-04 — **Round 23 — closed GAP_AUDIT §177–§188 (12 items):**
   1. **`DiagnosticsScreen` device uptime in device info card (§177)** — `SystemClock.elapsedRealtime()` → `DiagInfoRow("Device uptime", "Xh Ym")`.
   2. **`ActivityScreen` LabelsList no-results empty state (§179)** — `SearchOff` icon + `"No labels match X"` box when `displayLabels.isEmpty() && labelSearch.isNotBlank()`.

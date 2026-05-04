@@ -335,6 +335,25 @@ fun DiagnosticsScreen(
                         color = ARIAColors.Accent, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
                     )
                 )
+                // Round 24 §200: copy log text to clipboard.
+                val clipMgrDiag  = LocalClipboardManager.current
+                var logCopied by remember { mutableStateOf(false) }
+                if (progressLog.isNotBlank()) {
+                    IconButton(
+                        onClick = {
+                            clipMgrDiag.setText(androidx.compose.ui.text.AnnotatedString(progressLog))
+                            logCopied = true
+                        },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            if (logCopied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+                            contentDescription = "Copy log",
+                            tint = if (logCopied) ARIAColors.Success else ARIAColors.Muted,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
                 if (progressLogBytes > 0L) {
                     // Round 15 §86: clear progress.txt inline button with confirmation.
                     var showClearProgressDialog by remember { mutableStateOf(false) }

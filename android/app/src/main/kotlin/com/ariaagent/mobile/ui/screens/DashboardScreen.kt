@@ -565,6 +565,12 @@ private fun SessionStatsCard(
             if (stats.agentLoopErrors > 0) {
                 SessionStat("Loop Err", "${stats.agentLoopErrors}", valueColor = ARIAColors.Error)
             }
+            // Round 24 §192: total session tokens chip.
+            if (stats.totalSessionTokens > 0L) {
+                val tokenDisplay = if (stats.totalSessionTokens >= 1_000L)
+                    "${stats.totalSessionTokens / 1_000L}K tok" else "${stats.totalSessionTokens} tok"
+                SessionStat("Tokens", tokenDisplay)
+            }
         }
         if (stats.tasksCompleted > 0 || stats.inferenceTimeoutCount > 0) {
             Spacer(Modifier.height(6.dp))

@@ -615,9 +615,10 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
             contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Round 16 §99: edge-cases filter chip row.
+            // Round 16 §99: edge-cases filter chip row + Round 24 §190: sort-by toggle.
             item {
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                var sortByReward by remember { mutableStateOf(false) }
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(
                         selected = showEdgeCasesOnly,
                         onClick  = { showEdgeCasesOnly = !showEdgeCasesOnly },
@@ -634,6 +635,21 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                         leadingIcon = if (showEdgeCasesOnly) {{
                             Icon(Icons.Default.FilterAlt, null, tint = ARIAColors.Warning, modifier = Modifier.size(14.dp))
                         }} else null,
+                    )
+                    // Round 24 §190: sort-by-reward toggle chip.
+                    FilterChip(
+                        selected = sortByReward,
+                        onClick  = { sortByReward = !sortByReward },
+                        label    = {
+                            Text(
+                                if (sortByReward) "↑ Reward" else "Recent",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ARIAColors.Success.copy(alpha = 0.15f),
+                            selectedLabelColor     = ARIAColors.Success,
+                        ),
                     )
                 }
             }
@@ -979,6 +995,9 @@ private fun ReplayList(
     var expandedSessionId by remember { mutableStateOf<String?>(null) }
     var detailStep        by remember { mutableStateOf<ReplayStepItem?>(null) }
 
+    // Round 24 §195: total step count across all replay sessions.
+    val totalReplaySteps = remember(sessions) { sessions.sumOf { it.stepCount } }
+
     // Step detail dialog
     detailStep?.let { step ->
         AlertDialog(
@@ -1050,6 +1069,24 @@ private fun ReplayList(
             contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Round 24 §195: total step count header.
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ARIAColors.Primary.copy(alpha = 0.07f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Replay, null, tint = ARIAColors.Primary, modifier = Modifier.size(13.dp))
+                    Text(
+                        "${sessions.size} session${if (sessions.size == 1) "" else "s"} · $totalReplaySteps total step${if (totalReplaySteps == 1) "" else "s"}",
+                        style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
             items(sessions, key = { it.sessionId }) { session ->
                 val isExpanded = expandedSessionId == session.sessionId
                 val steps      = if (isExpanded) replaySteps else emptyList()

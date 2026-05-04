@@ -71,7 +71,8 @@ fun ChatScreen(vm: AgentViewModel) {
     val hwStats      by vm.hardwareStats.collectAsState()
 
     var input by remember { mutableStateOf("") }
-    var showClearDialog by remember { mutableStateOf(false) }
+    var showClearDialog   by remember { mutableStateOf(false) }
+    val shareCtx          = LocalContext.current
 
     val listState    = rememberLazyListState()
     val scope        = rememberCoroutineScope()
@@ -133,6 +134,39 @@ fun ChatScreen(vm: AgentViewModel) {
         )
 
         ContextTagBar(taskQueueCount = taskQueue.size, appSkillsCount = appSkills.size)
+
+        // Round 24 §189: share/export chat history button row — visible when there are user messages.
+        if (messages.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = {
+                        val text = messages.drop(1).joinToString("\n\n") { msg ->
+                            val role = if (msg.role == "user") "You" else "ARIA"
+                            "$role: ${msg.text}"
+                        }
+                        shareCtx.startActivity(
+                            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, text)
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "ARIA Chat Export")
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }.let { android.content.Intent.createChooser(it, "Export chat") }
+                        )
+                    },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Icon(Icons.Default.Share, null, tint = ARIAColors.Muted, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Export chat", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp))
+                }
+            }
+        }
 
         // Round 18 §126: model-not-loaded micro-warning so the user knows why replies fail.
         if (!llmLoaded) {

@@ -542,6 +542,25 @@ fun ControlScreen(
                 maxLines = 3,
                 enabled = isIdle
             )
+            // Round 24 §193: "Paste from clipboard" quick-fill button.
+            if (isIdle) {
+                val clipMgr = LocalClipboardManager.current
+                val clipText = clipMgr.getText()?.text.orEmpty().trim()
+                if (clipText.isNotBlank() && clipText != goalText) {
+                    TextButton(
+                        onClick = { goalText = clipText.take(200) },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp),
+                    ) {
+                        Icon(Icons.Default.ContentPaste, null, tint = ARIAColors.Muted, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Paste: ${clipText.take(36)}${if (clipText.length > 36) "…" else ""}",
+                            style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 10.sp),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
             // Round 16 §100: character count indicator — turns amber at 160, red at 200.
             if (goalText.isNotBlank()) {
                 Text(
@@ -559,15 +578,27 @@ fun ControlScreen(
                     textAlign = TextAlign.End,
                 )
             }
-            // Round 14 §73: recently-completed goals as one-tap chips.
+            // Round 14 §73: recently-completed goals as one-tap chips + Round 24 §197: clear history.
             if (recentGoals.isNotEmpty() && isIdle) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "RECENT GOALS",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = ARIAColors.Muted, fontSize = 9.sp
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "RECENT GOALS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = ARIAColors.Muted, fontSize = 9.sp
+                        )
                     )
-                )
+                    TextButton(
+                        onClick = { vm.clearRecentGoals() },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    ) {
+                        Text("Clear", style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted, fontSize = 9.sp))
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 androidx.compose.foundation.lazy.LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -209,6 +209,43 @@ fun SafetyScreen(
             }
         }
 
+        // Round 24 §198: copy blocked packages list to clipboard.
+        item {
+            if (safetyConfig.blockedPackages.isNotEmpty()) {
+                val clipCtx = LocalContext.current
+                val clipMgr = LocalClipboardManager.current
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    var copied by remember { mutableStateOf(false) }
+                    TextButton(
+                        onClick = {
+                            clipMgr.setText(
+                                androidx.compose.ui.text.AnnotatedString(
+                                    safetyConfig.blockedPackages.joinToString("\n")
+                                )
+                            )
+                            copied = true
+                        },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                    ) {
+                        Icon(
+                            if (copied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+                            null,
+                            tint = if (copied) ARIAColors.Success else ARIAColors.Muted,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (copied) "Copied!" else "Copy blocklist",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = if (copied) ARIAColors.Success else ARIAColors.Muted,
+                                fontSize = 10.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         // ── 4. Allowlist Mode ─────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(16.dp))
