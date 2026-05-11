@@ -278,7 +278,7 @@ fun DashboardScreen(vm: AgentViewModel = viewModel()) {
                         modifier = if (agentState.currentTask.isNotBlank()) Modifier.weight(1f)
                                    else Modifier.fillMaxWidth(),
                         shape    = RoundedCornerShape(10.dp),
-                        colors   = OutlinedButtonDefaults.colors(contentColor = ARIAColors.Muted),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = ARIAColors.Muted),
                         border   = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Divider),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {

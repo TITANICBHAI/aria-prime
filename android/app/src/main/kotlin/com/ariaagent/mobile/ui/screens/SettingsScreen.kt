@@ -1040,7 +1040,7 @@ fun SettingsScreen(
                 .fillMaxWidth()
                 .height(48.dp),
             shape  = RoundedCornerShape(12.dp),
-            colors = OutlinedButtonDefaults.colors(contentColor = ARIAColors.Primary),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = ARIAColors.Primary),
             border = androidx.compose.foundation.BorderStroke(1.dp, ARIAColors.Primary.copy(alpha = 0.45f))
         ) {
             Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))

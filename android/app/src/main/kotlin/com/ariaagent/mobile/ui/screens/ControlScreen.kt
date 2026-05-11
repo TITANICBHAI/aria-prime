@@ -7,6 +7,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
@@ -600,12 +604,12 @@ fun ControlScreen(
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                androidx.compose.foundation.lazy.LazyRow(
+                LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     contentPadding = PaddingValues(end = 8.dp)
                 ) {
-                    androidx.compose.foundation.lazy.items(recentGoals.take(5)) { item ->
-                        androidx.compose.material3.AssistChip(
+                    items(recentGoals.take(5)) { item ->
+                        AssistChip(
                             onClick = {
                                 goalText  = item.goal
                                 if (item.appPackage.isNotBlank()) targetApp = item.appPackage
@@ -619,11 +623,11 @@ fun ControlScreen(
                                     maxLines = 1,
                                 )
                             },
-                            colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                            colors = AssistChipDefaults.assistChipColors(
                                 containerColor = ARIAColors.Surface,
                                 labelColor     = ARIAColors.OnSurface,
                             ),
-                            border = androidx.compose.material3.AssistChipDefaults.assistChipBorder(
+                            border = AssistChipDefaults.assistChipBorder(
                                 enabled = true,
                                 borderColor = ARIAColors.Divider
                             )
@@ -664,11 +668,11 @@ fun ControlScreen(
                     )
                 )
                 Spacer(Modifier.height(4.dp))
-                androidx.compose.foundation.lazy.LazyRow(
+                LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    androidx.compose.foundation.lazy.items(packageSuggests) { (_, pkg) ->
-                        androidx.compose.material3.SuggestionChip(
+                    items(packageSuggests) { (_, pkg) ->
+                        SuggestionChip(
                             onClick = { targetApp = pkg },
                             label = {
                                 Text(

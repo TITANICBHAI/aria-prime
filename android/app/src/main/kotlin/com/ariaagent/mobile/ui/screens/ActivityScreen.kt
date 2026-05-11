@@ -1165,7 +1165,7 @@ private fun SessionReplayCard(
             .background(ARIAColors.Surface)
     ) {
         // ── Session header row ──────────────────────────────────────────────────
-        val sessionShareCtx = LocalContext.current
+        val sessionShareCtx = androidx.compose.ui.platform.LocalContext.current
         Row(
             modifier = Modifier
                 .fillMaxWidth()

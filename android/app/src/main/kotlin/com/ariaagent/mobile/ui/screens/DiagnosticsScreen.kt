@@ -21,7 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -321,10 +326,12 @@ fun DiagnosticsScreen(
             // Round 12: shows the current size of aria_progress.txt on disk so
             // users can see if it's growing unexpectedly.
             var progressLogBytes by remember { mutableLongStateOf(0L) }
+            var progressLog by remember { mutableStateOf("") }
             LaunchedEffect(Unit) {
                 progressLogBytes = withContext(Dispatchers.IO) {
                     com.ariaagent.mobile.core.persistence.ProgressPersistence.logFileSizeBytes(context)
                 }
+                progressLog = crashLines.joinToString("\n")
             }
 
             Row(
