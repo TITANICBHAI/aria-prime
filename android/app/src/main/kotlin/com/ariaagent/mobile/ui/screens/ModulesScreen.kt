@@ -138,7 +138,7 @@ fun ModulesScreen(
                 val totalLoadedMb: Int = remember(loadedLlms) {
                     loadedLlms.values.filter { it.isLoaded }
                         .sumOf { entry ->
-                            (com.ariaagent.mobile.core.model.ModelCatalog.findById(entry.modelId)?.displaySizeMb ?: 0).toInt()
+                            (ModelCatalog.findById(entry.modelId)?.displaySizeMb ?: 0).toInt()
                         }
                 }
                 if (totalLoadedMb > 0) {

@@ -46,6 +46,7 @@ import com.ariaagent.mobile.core.system.NetworkMonitor
 import com.ariaagent.mobile.ui.ComposeMainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
