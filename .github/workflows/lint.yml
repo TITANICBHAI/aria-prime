@@ -50,6 +50,7 @@ jobs:
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g
         run: |
+          mkdir -p build
           ./gradlew lint \
             --no-daemon \
             --warning-mode all \
