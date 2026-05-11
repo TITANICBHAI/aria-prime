@@ -435,7 +435,7 @@ private fun ActionsList(logs: List<ActionLogEntry>, onClearLog: () -> Unit = {})
                     Text(
                         "${filtered.size} / ${logs.size}",
                         style = MaterialTheme.typography.labelSmall.copy(color = ARIAColors.Muted),
-                        modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp)
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(start = 4.dp)
                     )
                 }
             }
@@ -669,7 +669,7 @@ private fun MemoryList(entries: List<MemoryEntry>, stats: MemoryStatsUi) {
                         ),
                     )
                     // Round 25 §205: export memory entries as plain-text share.
-                    val exportCtx = LocalContext.current
+                    val exportCtx = androidx.compose.ui.platform.LocalContext.current
                     if (displayEntries.isNotEmpty()) {
                         IconButton(
                             onClick = {
@@ -869,8 +869,8 @@ private fun LabelsList(labels: List<com.ariaagent.mobile.core.memory.ObjectLabel
         val displayLabels = remember(labelSearch, labels) {
             if (labelSearch.isBlank()) labels
             else labels.filter {
-                it.label.contains(labelSearch, ignoreCase = true) ||
-                it.objectId.contains(labelSearch, ignoreCase = true)
+                it.name.contains(labelSearch, ignoreCase = true) ||
+                it.id.contains(labelSearch, ignoreCase = true)
             }
         }
         LazyColumn(

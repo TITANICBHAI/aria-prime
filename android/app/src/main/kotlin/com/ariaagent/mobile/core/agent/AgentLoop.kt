@@ -969,7 +969,7 @@ object AgentLoop {
                     if (!actionSuccess) {
                         AgentEventBus.emit("action_failed", mapOf(
                             "step"       to state.stepCount,
-                            "appPackage" to state.currentApp,
+                            "appPackage" to state.appPackage,
                             "actionJson" to actionJson.take(200),
                         ))
                     }

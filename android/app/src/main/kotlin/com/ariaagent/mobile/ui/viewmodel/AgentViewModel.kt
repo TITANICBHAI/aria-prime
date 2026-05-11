@@ -168,6 +168,7 @@ data class MemoryStatsUi(
     val untrained: Int   = 0,
     val enrichedLabels: Int = 0,
     val totalLabels: Int    = 0,
+    val totalReward: Double = 0.0,
 )
 
 /** Phase 15: mirrors TaskQueueManager.QueuedTask for Compose UI. */
