@@ -1,5 +1,6 @@
 package com.ariaagent.mobile.core.ai
 
+import com.ariaagent.mobile.core.events.AgentEventBus
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -95,7 +96,25 @@ object LlamaEngine {
         lastMemoryMapping = memoryMapping
         lastGpuUbatch    = gpuUbatch
         if (jniAvailable) {
-            modelHandle   = nativeLoadModel(path, contextSize, nGpuLayers, gpuBackend, memoryMapping)
+            modelHandle = nativeLoadModel(path, contextSize, nGpuLayers, gpuBackend, memoryMapping)
+
+            // ── Kotlin-level GPU → CPU fallback (belt-and-suspenders) ────────────
+            // The C++ layer already retries internally, but if a future llama.cpp
+            // version changes that behaviour, or if GGML's backend registry returns a
+            // device that passes the enumeration check but still fails to allocate, we
+            // catch the 0L handle here and retry from the JVM side.
+            // We also emit an event so the UI can surface a warning chip.
+            if (modelHandle == 0L && nGpuLayers > 0 && gpuBackend != "cpu") {
+                android.util.Log.w("LlamaEngine",
+                    "load: '$gpuBackend' GPU backend returned null — Kotlin-level CPU retry")
+                AgentEventBus.emit("gpu_backend_fallback",
+                    mapOf("requested" to gpuBackend, "fallback" to "cpu",
+                          "model" to path))
+                lastGpuBackend  = "cpu"
+                lastNGpuLayers  = 0
+                modelHandle = nativeLoadModel(path, contextSize, 0, "cpu", memoryMapping)
+            }
+
             contextHandle = if (modelHandle != 0L)
                 nativeCreateContext(modelHandle, contextSize, flashAttn, kvCacheQuant, gpuUbatch) else 0L
             memoryMb      = if (isLoaded()) nativeGetMemoryMb() else 0.0
@@ -274,6 +293,18 @@ object LlamaEngine {
         }
         unloadVision()
         visionModelHandle = nativeLoadModel(visionModelPath, contextSize, nGpuLayers, gpuBackend, memoryMapping)
+
+        // Same GPU → CPU fallback as load() — vision models are even more likely to
+        // hit OOM with GPU offload active since CLIP + LLM compete for the same Mali
+        // VRAM budget.  Falling back to CPU keeps vision functional rather than broken.
+        if (visionModelHandle == 0L && nGpuLayers > 0 && gpuBackend != "cpu") {
+            android.util.Log.w("LlamaEngine",
+                "loadVision: '$gpuBackend' failed — retrying with CPU-only")
+            AgentEventBus.emit("gpu_backend_fallback",
+                mapOf("requested" to gpuBackend, "fallback" to "cpu", "model" to visionModelPath))
+            visionModelHandle = nativeLoadModel(visionModelPath, contextSize, 0, "cpu", memoryMapping)
+        }
+
         if (visionModelHandle == 0L) {
             android.util.Log.e("LlamaEngine", "loadVision: failed to load vision base model")
             return false

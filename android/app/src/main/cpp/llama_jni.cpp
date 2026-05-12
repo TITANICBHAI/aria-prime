@@ -150,6 +150,33 @@ Java_com_ariaagent_mobile_core_ai_LlamaEngine_nativeLoadModel(
     }
 
     llama_model* model = llama_model_load_from_file(path, mparams);
+
+    // ── GPU → CPU automatic fallback ──────────────────────────────────────────
+    // If a GPU backend (OpenCL or Vulkan) was explicitly requested but the device
+    // either lacks the vendor driver (libOpenCL.so / libvulkan.so not present),
+    // has no eligible platform/device, or cannot allocate the model's memory
+    // footprint, llama.cpp returns nullptr instead of falling back on its own.
+    //
+    // Without this retry the Kotlin side receives modelHandle=0, leaves the model
+    // unloaded while jniAvailable=true, and the agent throws IllegalStateException
+    // on every inference step — the user sees nothing useful and the UI shows
+    // the run counter ticking up with no output (appears stuck / "stub-like").
+    //
+    // Fix: if the GPU path failed, retry immediately on CPU before crossing back
+    // to the JNI boundary.  path is still valid here (released below).
+    if (!model && !selected_devices.empty()) {
+        LOGE("GPU backend '%s' failed to load model (driver absent / OOM / no platform) "
+             "— automatic CPU-only fallback", backend_norm.c_str());
+        mparams.devices      = nullptr;   // let GGML choose the CPU device
+        mparams.n_gpu_layers = 0;         // no GPU offload
+        model = llama_model_load_from_file(path, mparams);
+        if (model) {
+            LOGI("CPU fallback: model loaded successfully — inference will run on CPU");
+        } else {
+            LOGE("CPU fallback also failed — model file missing or corrupt at: %s", path);
+        }
+    }
+
     env->ReleaseStringUTFChars(path_jstr,        path);
     env->ReleaseStringUTFChars(gpu_backend_jstr, gpu_backend);
 
