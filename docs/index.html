@@ -7,118 +7,233 @@
   <meta name="description" content="Aria Prime runs quantized LLMs entirely on-device via llama.cpp/JNI with OpenCL GPU acceleration. A 1,063-line AgentLoop drives a read-decide-act-observe cycle with SAM2 vision and AccessibilityService screen context." />
   <meta property="og:title" content="Aria Prime — On-Device AI Agent for Android" />
   <meta property="og:description" content="Local LLM inference via llama.cpp/JNI. No cloud. No API keys. Real on-device AI." />
-  <meta property="og:url" content="https://github.com/TITANICBHAI/aria-prime" />
+  <meta property="og:url" content="https://titanicbhai.github.io/aria-prime/" />
+  <meta property="og:image" content="https://titanicbhai.github.io/assets/aria-prime-feature.png" />
   <link rel="icon" href="https://titanicbhai.github.io/assets/tbtechs-logo.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #060710; --surface: #0d0f1a; --surface2: #131624;
-      --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
-      --accent: #3b82f6; --accent-glow: rgba(59,130,246,0.25);
-      --text: #f1f5f9; --muted: #94a3b8; --radius: 12px;
+      --bg: #060710;
+      --surface: #0d0f1a;
+      --surface2: #131624;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.13);
+      --accent: #3b82f6;
+      --accent2: #6366f1;
+      --accent-glow: rgba(59,130,246,0.25);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --radius: 12px;
     }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+
+    /* NAV */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 1rem 2rem; background: rgba(6,7,16,0.85); backdrop-filter: blur(16px);
+      padding: 0.9rem 2rem;
+      background: rgba(6,7,16,0.88); backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
     .nav-brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none; }
-    .nav-logo { width: 28px; height: 28px; border-radius: 6px; }
-    .nav-links { display: flex; gap: 1.5rem; }
+    .nav-logo { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
+    .nav-name { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 0.25rem; }
+    .nav-links { display: flex; gap: 1.75rem; }
     .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
-    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.1rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
     .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 20px var(--accent-glow); }
-    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 0 28px var(--accent-glow); }
     .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+
+    /* HERO */
     .hero {
       min-height: 100vh; display: flex; flex-direction: column;
       align-items: center; justify-content: center; text-align: center;
-      padding: 8rem 2rem 4rem; position: relative; overflow: hidden;
+      padding: 8rem 2rem 5rem; position: relative; overflow: hidden;
     }
     .hero-bg {
       position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse at 40% 35%, rgba(59,130,246,0.10) 0%, transparent 55%),
-                  radial-gradient(ellipse at 70% 70%, rgba(99,102,241,0.06) 0%, transparent 50%);
+      background:
+        radial-gradient(ellipse at 35% 30%, rgba(59,130,246,0.13) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 70%, rgba(99,102,241,0.08) 0%, transparent 50%);
     }
     .grid-lines {
       position: absolute; inset: 0; pointer-events: none;
-      background-image: linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+      background-image:
+        linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
       background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+      mask-image: radial-gradient(ellipse at center, black 10%, transparent 72%);
     }
     .badge {
+      position: relative; z-index: 1;
       display: inline-flex; align-items: center; gap: 0.5rem;
       padding: 0.35rem 0.9rem; border-radius: 999px;
-      border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.08);
-      font-size: 0.8rem; font-weight: 600; color: var(--accent); margin-bottom: 1.5rem; z-index: 1; position: relative;
+      border: 1px solid rgba(59,130,246,0.35); background: rgba(59,130,246,0.09);
+      font-size: 0.78rem; font-weight: 600; color: var(--accent); margin-bottom: 1.5rem;
+      letter-spacing: 0.02em;
     }
-    .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 1.5s ease-in-out infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    h1 { font-size: clamp(2.5rem,6vw,4.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 1.25rem; position: relative; z-index: 1; }
-    h1 span { color: var(--accent); }
-    .hero-sub { font-size: clamp(1rem,2vw,1.15rem); color: var(--muted); max-width: 560px; margin: 0 auto 2.5rem; position: relative; z-index: 1; }
-    .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; position: relative; z-index: 1; }
-    .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent); background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); border-radius: 4px; padding: 0.15rem 0.5rem; }
+    .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 1.6s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+    h1 {
+      position: relative; z-index: 1;
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      font-weight: 900; line-height: 1.05; letter-spacing: -0.035em; margin-bottom: 1.5rem;
+    }
+    .h1-line2 { display: block; color: var(--accent); }
+    .hero-sub {
+      position: relative; z-index: 1;
+      font-size: clamp(1rem, 2.2vw, 1.2rem); color: var(--muted);
+      max-width: 580px; margin: 0 auto 2.75rem; line-height: 1.7;
+    }
+    .hero-cta { position: relative; z-index: 1; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    /* FEATURE IMAGE */
+    .hero-image-wrap {
+      position: relative; z-index: 1;
+      margin-top: 4rem; width: 100%; max-width: 900px;
+      border-radius: 16px; overflow: hidden;
+      border: 1px solid var(--border2);
+      box-shadow: 0 0 80px rgba(59,130,246,0.12), 0 32px 80px rgba(0,0,0,0.6);
+    }
+    .hero-image-wrap img { width: 100%; display: block; }
+    .hero-image-glow {
+      position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%);
+      width: 80%; height: 80px;
+      background: radial-gradient(ellipse, rgba(59,130,246,0.25) 0%, transparent 70%);
+      pointer-events: none; filter: blur(20px);
+    }
+
+    /* STATS ROW */
+    .stats-section { padding: 3.5rem 2rem; max-width: 900px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .stat { background: var(--surface); padding: 1.75rem 1.5rem; text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 900; color: var(--accent); letter-spacing: -0.03em; font-family: 'JetBrains Mono', monospace; }
+    .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; font-weight: 500; }
+
+    /* SECTIONS */
     .section { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
-    .section-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
-    .section-title { font-size: clamp(1.75rem,4vw,2.5rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; }
-    .section-desc { color: var(--muted); font-size: 1rem; max-width: 540px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 1.25rem; margin-top: 3rem; }
+    .section-label { font-size: 0.73rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
+    .section-title { font-size: clamp(1.75rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 1rem; line-height: 1.15; }
+    .section-desc { color: var(--muted); font-size: 1rem; max-width: 540px; line-height: 1.7; }
+
+    /* ARCHITECTURE LAYERS */
+    .arch-grid { display: flex; flex-direction: column; gap: 1px; margin-top: 3rem; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .arch-row {
+      display: flex; align-items: flex-start; gap: 1.5rem;
+      background: var(--surface); padding: 1.5rem 1.75rem;
+      transition: background 0.2s;
+    }
+    .arch-row:hover { background: var(--surface2); }
+    .arch-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
+      color: var(--accent); background: rgba(59,130,246,0.10);
+      border: 1px solid rgba(59,130,246,0.2); border-radius: 5px;
+      padding: 0.2rem 0.55rem; margin-top: 0.15rem; white-space: nowrap; flex-shrink: 0;
+    }
+    .arch-body h3 { font-size: 0.975rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .arch-body p { font-size: 0.865rem; color: var(--muted); line-height: 1.65; }
+
+    /* FEATURES GRID */
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1.25rem; margin-top: 3rem; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: border-color 0.2s, transform 0.2s; }
     .card:hover { border-color: rgba(59,130,246,0.3); transform: translateY(-2px); }
-    .card-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent); }
-    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .card p { font-size: 0.875rem; color: var(--muted); line-height: 1.65; }
-    .stack-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }
-    .tag { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 500; padding: 0.3rem 0.7rem; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+    .card-icon { width: 42px; height: 42px; border-radius: 10px; background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent); flex-shrink: 0; }
+    .card h3 { font-size: 0.975rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .card p { font-size: 0.865rem; color: var(--muted); line-height: 1.65; }
+
+    /* STACK */
+    .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-top: 2.5rem; }
+    .stack-item { background: var(--surface); padding: 1.1rem 1.25rem; }
+    .stack-item .s-label { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 500; color: var(--accent); }
+    .stack-item .s-desc { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* DIVIDER */
     .divider { height: 1px; background: var(--border); max-width: 1100px; margin: 0 auto; }
-    .cta-section { padding: 5rem 2rem; text-align: center; }
-    .cta-box { max-width: 600px; margin: 0 auto; background: var(--surface); border: 1px solid rgba(59,130,246,0.2); border-radius: 20px; padding: 3rem 2rem; position: relative; overflow: hidden; }
-    .cta-box::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:200px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
-    .cta-box h2 { font-size: 1.875rem; font-weight: 800; margin-bottom: 0.75rem; }
-    .cta-box p { color: var(--muted); margin-bottom: 2rem; }
-    .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    /* CTA */
+    .cta-section { padding: 6rem 2rem; text-align: center; }
+    .cta-box {
+      max-width: 620px; margin: 0 auto;
+      background: var(--surface); border: 1px solid rgba(59,130,246,0.22);
+      border-radius: 20px; padding: 3.5rem 2.5rem;
+      position: relative; overflow: hidden;
+    }
+    .cta-box::before {
+      content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 220px; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+    .cta-box::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.07) 0%, transparent 65%);
+    }
+    .cta-box h2 { position: relative; z-index: 1; font-size: 2rem; font-weight: 800; margin-bottom: 0.75rem; }
+    .cta-box p { position: relative; z-index: 1; color: var(--muted); margin-bottom: 2rem; line-height: 1.65; }
+    .cta-buttons { position: relative; z-index: 1; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    /* FOOTER */
     footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
-    @media (max-width: 640px) { nav { padding: 1rem; } .nav-links { display: none; } }
+
+    @media (max-width: 640px) {
+      nav { padding: 0.85rem 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 7rem 1.25rem 4rem; }
+      .arch-row { flex-direction: column; gap: 0.75rem; }
+    }
   </style>
 </head>
 <body>
+
   <nav>
     <a href="https://titanicbhai.github.io" class="nav-brand">
       <img src="https://titanicbhai.github.io/assets/tbtechs-logo.png" alt="TBTechs" class="nav-logo" />
-      Aria Prime
+      TBTechs <span class="nav-name">/ Aria Prime</span>
     </a>
     <div class="nav-links">
       <a href="#architecture">Architecture</a>
       <a href="#stack">Stack</a>
       <a href="https://github.com/TITANICBHAI/aria-prime" target="_blank" rel="noopener">GitHub</a>
     </div>
-    <a href="https://github.com/TITANICBHAI/aria-prime" class="btn btn-primary" target="_blank" rel="noopener">View Source</a>
+    <a href="https://github.com/TITANICBHAI/aria-prime" class="btn btn-primary" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      View Source
+    </a>
   </nav>
 
   <section class="hero">
     <div class="hero-bg"></div>
     <div class="grid-lines"></div>
-    <div class="badge"><div class="ai-dot"></div> On-Device AI Agent</div>
-    <h1>Local LLM inference.<br /><span>Zero cloud.</span></h1>
-    <p class="hero-sub">Aria Prime runs quantized language models entirely on your Android device — via a custom JNI bridge to llama.cpp with OpenCL GPU acceleration. No API key. No server. No data leaves the phone.</p>
+    <div class="badge"><div class="ai-dot"></div>On-Device AI Agent &mdash; Android</div>
+    <h1>Local LLM inference.<br /><span class="h1-line2">Zero cloud. Zero API.</span></h1>
+    <p class="hero-sub">Aria Prime runs quantized language models entirely on your Android device — via a custom JNI bridge to llama.cpp with OpenCL GPU acceleration. Your data stays on your phone. No server, no key, no account.</p>
     <div class="hero-cta">
       <a href="https://github.com/TITANICBHAI/aria-prime" class="btn btn-primary" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
         Explore on GitHub
       </a>
-      <a href="https://titanicbhai.github.io" class="btn btn-ghost" target="_blank" rel="noopener">All TBTechs Projects</a>
+      <a href="https://titanicbhai.github.io" class="btn btn-ghost">All TBTechs Projects</a>
+    </div>
+    <div class="hero-image-wrap">
+      <img src="https://titanicbhai.github.io/assets/aria-prime-feature.png" alt="Aria Prime — on-device AI agent" />
+      <div class="hero-image-glow"></div>
+    </div>
+  </section>
+
+  <section class="stats-section">
+    <div class="stats-row">
+      <div class="stat"><div class="stat-num">1,063</div><div class="stat-label">AgentLoop lines</div></div>
+      <div class="stat"><div class="stat-num">13</div><div class="stat-label">Compose screens</div></div>
+      <div class="stat"><div class="stat-num">0</div><div class="stat-label">Cloud calls</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Core subsystems</div></div>
     </div>
   </section>
 
@@ -126,50 +241,50 @@
 
   <section class="section" id="architecture">
     <div class="section-label">Architecture</div>
-    <h2 class="section-title">Built from the ground up — no wrappers</h2>
-    <p class="section-desc">Every layer is hand-built. The agent loop drives a read-decide-act-observe cycle with real OS integration — not a chatbot dressed up as an agent.</p>
-    <div class="grid-3">
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <h2 class="section-title">Built from the ground up.<br />No wrappers. No shortcuts.</h2>
+    <p class="section-desc">Every layer is purpose-built. The agent loop drives a real read-decide-act-observe cycle with live OS integration — not a chatbot with a fancy UI on top.</p>
+    <div class="arch-grid">
+      <div class="arch-row">
+        <div class="arch-num">01</div>
+        <div class="arch-body">
+          <h3>AgentLoop — 1,063 lines</h3>
+          <p>The central orchestration engine drives a continuous read &rarr; decide &rarr; act &rarr; observe cycle. Circuit breakers prevent runaway actions, an event router dispatches signals between subsystems, and a health monitor tracks the state of every component in real time.</p>
         </div>
-        <h3>1,063-Line AgentLoop</h3>
-        <p>The core orchestration engine drives a continuous read &rarr; decide &rarr; act &rarr; observe cycle. Circuit breakers, event routing, and health monitors keep every component accountable.</p>
       </div>
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <div class="arch-row">
+        <div class="arch-num">02</div>
+        <div class="arch-body">
+          <h3>llama.cpp via JNI / NDK</h3>
+          <p>A custom C++ JNI bridge calls llama.cpp directly from the JVM, running quantized GGUF models on the device GPU via OpenCL. The native layer handles memory allocation, model context, token sampling, and crash recovery — bypassing the JVM for all math-critical paths.</p>
         </div>
-        <h3>llama.cpp via JNI</h3>
-        <p>Custom C++ JNI bridge to llama.cpp for quantized GGUF model inference directly on the Android GPU — OpenCL acceleration, native crash handling, and direct memory management.</p>
       </div>
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <div class="arch-row">
+        <div class="arch-num">03</div>
+        <div class="arch-body">
+          <h3>SAM2 Visual Segmentation Engine</h3>
+          <p>A SAM2 model gives the agent spatial awareness of the screen — identifying UI regions, boundaries, and interactive zones by visual segmentation rather than relying solely on the accessibility view hierarchy.</p>
         </div>
-        <h3>SAM2 Vision Engine</h3>
-        <p>A SAM2 visual segmentation engine gives the agent spatial awareness of the screen — understanding UI regions without relying on view hierarchy alone.</p>
       </div>
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <div class="arch-row">
+        <div class="arch-num">04</div>
+        <div class="arch-body">
+          <h3>AccessibilityService Screen Context</h3>
+          <p>Android's AccessibilityService provides deep real-time screen context — the agent sees what is visible, what is focusable, and what text is on screen, without root or special system permissions.</p>
         </div>
-        <h3>AccessibilityService Context</h3>
-        <p>Android AccessibilityService provides deep screen-reading context — the agent understands what is visible and interactive without root or special permissions.</p>
       </div>
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 3a3 3 0 0 0-3 3l-7 3.5a3 3 0 0 0-4 0 3 3 0 0 0 4 0L15 6a3 3 0 0 0 3 3 3 3 0 0 0 0-6z"/></svg>
+      <div class="arch-row">
+        <div class="arch-num">05</div>
+        <div class="arch-body">
+          <h3>Gesture Execution Engine</h3>
+          <p>The agent executes real Android gestures — taps, swipes, long-presses, scrolls — via AccessibilityService gesture injection. It physically interacts with apps at the OS level, not through simulated events.</p>
         </div>
-        <h3>Gesture Execution Engine</h3>
-        <p>Drives real Android gestures — taps, swipes, scrolls — using AccessibilityService gesture injection. The agent physically interacts with apps, not just reads them.</p>
       </div>
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg>
+      <div class="arch-row">
+        <div class="arch-num">06</div>
+        <div class="arch-body">
+          <h3>Reinforcement Learning Policy Network</h3>
+          <p>A policy network shapes agent decision-making across sessions — improving action selection quality over time based on observed outcomes, building a local behavioral model that adapts to how you use your device.</p>
         </div>
-        <h3>RL Policy Network</h3>
-        <p>A reinforcement learning policy network shapes agent decision-making over time — improving action selection based on observed outcomes across sessions.</p>
       </div>
     </div>
   </section>
@@ -179,29 +294,42 @@
   <section class="section" id="stack">
     <div class="section-label">Stack</div>
     <h2 class="section-title">13 screens. Native C++. No compromises.</h2>
-    <p class="section-desc">Built with Kotlin + Compose on Android. Native C++ for math-critical paths and crash recovery. Every component purpose-built.</p>
-    <div class="stack-row">
-      <span class="tag">Kotlin</span><span class="tag">Jetpack Compose</span><span class="tag">llama.cpp</span><span class="tag">JNI / NDK</span>
-      <span class="tag">OpenCL GPU</span><span class="tag">SAM2</span><span class="tag">GGUF quantization</span><span class="tag">AccessibilityService</span>
-      <span class="tag">Gesture injection</span><span class="tag">RL policy</span><span class="tag">Native C++</span><span class="tag">Android</span>
+    <p class="section-desc">Kotlin and Jetpack Compose on Android. C++ via NDK for inference and crash-critical paths. Every component purpose-built for on-device operation.</p>
+    <div class="stack-grid">
+      <div class="stack-item"><div class="s-label">Kotlin</div><div class="s-desc">Application layer</div></div>
+      <div class="stack-item"><div class="s-label">Jetpack Compose</div><div class="s-desc">13 screens, dark UI</div></div>
+      <div class="stack-item"><div class="s-label">llama.cpp</div><div class="s-desc">LLM inference engine</div></div>
+      <div class="stack-item"><div class="s-label">JNI / NDK</div><div class="s-desc">Native bridge</div></div>
+      <div class="stack-item"><div class="s-label">OpenCL GPU</div><div class="s-desc">On-device acceleration</div></div>
+      <div class="stack-item"><div class="s-label">GGUF quantization</div><div class="s-desc">Compressed models</div></div>
+      <div class="stack-item"><div class="s-label">SAM2</div><div class="s-desc">Visual segmentation</div></div>
+      <div class="stack-item"><div class="s-label">AccessibilityService</div><div class="s-desc">Screen context</div></div>
+      <div class="stack-item"><div class="s-label">Gesture injection</div><div class="s-desc">OS-level interaction</div></div>
+      <div class="stack-item"><div class="s-label">RL policy network</div><div class="s-desc">Adaptive decisions</div></div>
+      <div class="stack-item"><div class="s-label">Native C++</div><div class="s-desc">Math + crash handling</div></div>
+      <div class="stack-item"><div class="s-label">Android</div><div class="s-desc">Target platform</div></div>
     </div>
   </section>
 
   <div class="divider"></div>
 
-  <section class="cta-section" id="cta">
+  <section class="cta-section">
     <div class="cta-box">
-      <h2>Explore the source</h2>
-      <p>Aria Prime is open source. Read the AgentLoop, the JNI bridge, or the RL policy — every layer is visible.</p>
+      <h2>Read the source</h2>
+      <p>The AgentLoop, the JNI bridge, the RL policy — every layer is open source. Clone it, read it, build on it.</p>
       <div class="cta-buttons">
-        <a href="https://github.com/TITANICBHAI/aria-prime" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
-        <a href="https://titanicbhai.github.io" class="btn btn-ghost" target="_blank" rel="noopener">TBTechs Studio</a>
+        <a href="https://github.com/TITANICBHAI/aria-prime" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+        <a href="https://titanicbhai.github.io" class="btn btn-ghost">TBTechs Studio</a>
       </div>
     </div>
   </section>
 
   <footer>
-    <p>Aria Prime by <a href="https://titanicbhai.github.io" target="_blank" rel="noopener">TBTechs</a> &mdash; also see <a href="https://github.com/TITANICBHAI/FocusFlow" target="_blank" rel="noopener">FocusFlow</a> and <a href="https://github.com/TITANICBHAI/PeopleMemory" target="_blank" rel="noopener">PeopleMemory</a></p>
+    <p>Aria Prime by <a href="https://titanicbhai.github.io" target="_blank" rel="noopener">TBTechs</a> &mdash; also see <a href="https://titanicbhai.github.io/FocusFlow/" target="_blank" rel="noopener">FocusFlow</a> and <a href="https://titanicbhai.github.io/PeopleMemory/" target="_blank" rel="noopener">PeopleMemory</a></p>
   </footer>
+
 </body>
 </html>
