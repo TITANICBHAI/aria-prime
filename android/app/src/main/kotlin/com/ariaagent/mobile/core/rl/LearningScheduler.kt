@@ -9,7 +9,9 @@ import android.os.PowerManager
 import android.util.Log
 import com.ariaagent.mobile.core.ai.LlamaEngine
 import com.ariaagent.mobile.core.ai.ModelManager
+import com.ariaagent.mobile.core.rl.DqnNetwork
 import com.ariaagent.mobile.core.rl.DreamEngine
+import com.ariaagent.mobile.core.rl.PpoNetwork
 import com.ariaagent.mobile.core.config.ConfigStore
 import com.ariaagent.mobile.core.events.AgentEventBus
 import com.ariaagent.mobile.core.memory.ExperienceStore
@@ -149,10 +151,74 @@ class LearningScheduler(private val context: Context) {
 
                 val store = ExperienceStore.getInstance(context)
 
-                // ── Step 1: Policy network REINFORCE update ────────────────────
-                // Runs on successful experience tuples for repeated UI tasks
-                PolicyNetwork.load(context)
-                Log.i(TAG, "PolicyNetwork loaded for REINFORCE update")
+                // ── Step 1: RL algorithm dispatch ─────────────────────────────
+                // Algorithm is selected by AriaConfig.rlAlgorithm:
+                //   "reinforce" (default) — PolicyNetwork REINFORCE (lightest)
+                //   "dqn"                 — DqnNetwork off-policy Q-learning
+                //   "ppo"                 — PpoNetwork on-policy PPO-Clip
+                val config = ConfigStore.getBlocking(context)
+                val rlAlgorithm = config.rlAlgorithm.lowercase().trim()
+                Log.i(TAG, "RL algorithm: $rlAlgorithm")
+
+                when (rlAlgorithm) {
+                    "dqn" -> {
+                        DqnNetwork.load(context)
+                        Log.i(TAG, "DqnNetwork loaded for off-policy training")
+                        val dqnTuples = store.getUntrainedSuccesses(limit = 256)
+                        var dqnLoss = 0.0
+                        for (tuple in dqnTuples) {
+                            // Use a zero-vector state embedding; real embeddings will be
+                            // provided by AgentLoop once DqnNetwork is wired into the loop.
+                            val stateEmb = FloatArray(DqnNetwork.STATE_DIM) { 0f }
+                            DqnNetwork.storeTransition(
+                                state  = stateEmb,
+                                action = 0,
+                                reward = tuple.reward.toFloat(),
+                                next   = stateEmb,
+                                done   = tuple.result != "success"
+                            )
+                        }
+                        repeat(4) { dqnLoss = DqnNetwork.trainStep() }
+                        DqnNetwork.save(context)
+                        AgentEventBus.emit("dqn_trained", mapOf(
+                            "tuples"  to dqnTuples.size,
+                            "loss"    to dqnLoss,
+                            "epsilon" to DqnNetwork.epsilon
+                        ))
+                        Log.i(TAG, "DqnNetwork training done — loss=$dqnLoss eps=${DqnNetwork.epsilon}")
+                    }
+                    "ppo" -> {
+                        PpoNetwork.load(context)
+                        Log.i(TAG, "PpoNetwork loaded for on-policy training")
+                        val ppoTuples = store.getUntrainedSuccesses(limit = 256)
+                        PpoNetwork.beginRollout()
+                        val zeroEmb = FloatArray(PpoNetwork.STATE_DIM) { 0f }
+                        for (tuple in ppoTuples) {
+                            val (_, logProb, value) = PpoNetwork.selectAction(zeroEmb, zeroEmb)
+                            PpoNetwork.storeStep(
+                                screenEmb = zeroEmb,
+                                goalEmb   = zeroEmb,
+                                action    = 0,
+                                logProb   = logProb,
+                                reward    = tuple.reward.toFloat(),
+                                value     = value,
+                                done      = tuple.result != "success"
+                            )
+                        }
+                        val ppoLoss = PpoNetwork.endRollout(lastValue = 0f)
+                        PpoNetwork.save(context)
+                        AgentEventBus.emit("ppo_trained", mapOf(
+                            "tuples" to ppoTuples.size,
+                            "loss"   to ppoLoss
+                        ))
+                        Log.i(TAG, "PpoNetwork training done — loss=$ppoLoss")
+                    }
+                    else -> {
+                        // Default: REINFORCE via PolicyNetwork
+                        PolicyNetwork.load(context)
+                        Log.i(TAG, "PolicyNetwork loaded for REINFORCE update")
+                    }
+                }
 
                 // ── Step 1.5: LLM reward enrichment ───────────────────────────
                 // Re-score experience tuples using the loaded LlamaEngine so LoRA

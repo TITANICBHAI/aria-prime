@@ -36,6 +36,10 @@ object PpoNetwork {
 
     private const val TAG = "PpoNetwork"
 
+    /** Public aliases used by LearningScheduler and tests. */
+    const val STATE_DIM = 256
+    const val GOAL_DIM  = 0   // PPO uses a flat state vector (no separate goal embedding)
+
     // ── Architecture ──────────────────────────────────────────────────────────
     private const val INPUT_DIM     = 256
     private const val ACT_H1        = 256

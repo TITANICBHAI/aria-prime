@@ -94,6 +94,7 @@ fun SettingsScreen(
     var flashAttn       by remember(config.flashAttn)                { mutableStateOf(config.flashAttn) }
     var kvCacheQuant    by remember(config.kvCacheQuantization)      { mutableStateOf(config.kvCacheQuantization) }
     var rlEnabled       by remember(config.rlEnabled)                { mutableStateOf(config.rlEnabled) }
+    var rlAlgorithm     by remember(config.rlAlgorithm)              { mutableStateOf(config.rlAlgorithm) }
     var loraPath        by remember(config.loraAdapterPath)          { mutableStateOf(config.loraAdapterPath ?: "") }
 
     // ── Permission state — checked live via DisposableEffect + moduleState ────
@@ -745,6 +746,34 @@ fun SettingsScreen(
 
             CardDivider()
 
+            // RL algorithm selector
+            FieldLabel("RL Algorithm")
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("reinforce", "dqn", "ppo").forEach { algo ->
+                    FilterChip(
+                        selected = rlAlgorithm == algo,
+                        onClick  = { rlAlgorithm = algo },
+                        label    = { Text(algo.uppercase(), style = MaterialTheme.typography.labelSmall) },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ARIAColors.Primary,
+                            selectedLabelColor     = ARIAColors.Background
+                        )
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when (rlAlgorithm) {
+                    "dqn" -> "Off-policy Deep Q-Network — best for replay-heavy training"
+                    "ppo" -> "On-policy PPO-Clip — most stable; needs more tuples per cycle"
+                    else  -> "Classic REINFORCE — lightest memory footprint (default)"
+                },
+                style = MaterialTheme.typography.bodySmall.copy(color = ARIAColors.Muted)
+            )
+
+            CardDivider()
+
             // LoRA adapter path — editable (matches RN)
             FieldLabel("LoRA Adapter Path")
             Spacer(Modifier.height(6.dp))
@@ -938,6 +967,7 @@ fun SettingsScreen(
                         gpuUbatch           = gpuUbatch,
                         memoryMapping       = memoryMapping,
                         rlEnabled           = rlEnabled,
+                        rlAlgorithm         = rlAlgorithm,
                         loraAdapterPath     = loraPath.trim(),
                     )
                 )

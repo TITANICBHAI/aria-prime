@@ -49,6 +49,10 @@ object DqnNetwork {
     private const val HIDDEN2    = 128
     private const val OUTPUT_DIM = 7
 
+    /** Public aliases used by LearningScheduler and tests. */
+    const val STATE_DIM = INPUT_DIM
+    const val GOAL_DIM  = 0   // DQN uses a flat state vector (no separate goal embedding)
+
     private const val GAMMA              = 0.99f
     private const val LEARNING_RATE      = 1e-4f
     private const val EPS_START          = 1.0f

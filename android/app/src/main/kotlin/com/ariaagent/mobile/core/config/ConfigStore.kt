@@ -73,6 +73,11 @@ data class AriaConfig(
     val loraAdapterPath: String = "",
     val rlEnabled: Boolean      = true,
     val learningRate: Double    = 1e-4,
+    /** Which RL algorithm to use during training cycles.
+     *  "reinforce" — classic REINFORCE via PolicyNetwork (default; lightest memory footprint)
+     *  "dqn"       — Deep Q-Network via DqnNetwork (off-policy; better for discrete action replay)
+     *  "ppo"       — PPO-Clip via PpoNetwork (on-policy; most stable but needs more tuples per cycle) */
+    val rlAlgorithm: String     = "reinforce",
 )
 
 object ConfigStore {
@@ -88,6 +93,7 @@ object ConfigStore {
     private val KEY_LORA_PATH    = stringPreferencesKey("loraAdapterPath")
     private val KEY_RL_ENABLED   = booleanPreferencesKey("rlEnabled")
     private val KEY_LEARNING_RATE = doublePreferencesKey("learningRate")
+    private val KEY_RL_ALGORITHM = stringPreferencesKey("rlAlgorithm")
     private val KEY_FLASH_ATTN   = booleanPreferencesKey("flashAttn")
     private val KEY_KV_QUANT     = booleanPreferencesKey("kvCacheQuantization")
     private val KEY_GPU_UBATCH   = intPreferencesKey("gpuUbatch")
@@ -123,6 +129,7 @@ object ConfigStore {
             prefs[KEY_LORA_PATH]     = config.loraAdapterPath
             prefs[KEY_RL_ENABLED]    = config.rlEnabled
             prefs[KEY_LEARNING_RATE] = config.learningRate
+            prefs[KEY_RL_ALGORITHM]  = config.rlAlgorithm
             prefs[KEY_FLASH_ATTN]    = config.flashAttn
             prefs[KEY_KV_QUANT]      = config.kvCacheQuantization
             prefs[KEY_GPU_UBATCH]    = config.gpuUbatch
@@ -150,6 +157,7 @@ object ConfigStore {
             loraAdapterPath  = legacy.getString("loraAdapterPath", LoraTrainer.latestAdapterPath(context) ?: "") ?: "",
             rlEnabled        = legacy.getBoolean("rlEnabled", true),
             learningRate     = legacy.getFloat("learningRate", 1e-4.toFloat()).toDouble(),
+            rlAlgorithm      = legacy.getString("rlAlgorithm", "reinforce") ?: "reinforce",
         ))
     }
 
@@ -177,6 +185,7 @@ object ConfigStore {
         },
         rlEnabled            = prefs[KEY_RL_ENABLED]    ?: true,
         learningRate         = prefs[KEY_LEARNING_RATE] ?: 1e-4,
+        rlAlgorithm          = prefs[KEY_RL_ALGORITHM]  ?: "reinforce",
         flashAttn            = prefs[KEY_FLASH_ATTN]    ?: false,
         kvCacheQuantization  = prefs[KEY_KV_QUANT]      ?: false,
         gpuUbatch            = prefs[KEY_GPU_UBATCH]    ?: 512,
