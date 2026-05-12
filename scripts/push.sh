@@ -6,6 +6,9 @@ COMMIT_MESSAGE="${COMMIT_MESSAGE:-chore: automated push}"
 git config user.email "agent@aria-prime.local" 2>/dev/null || true
 git config user.name  "ARIA Agent"             2>/dev/null || true
 
+# Remove stale lock left by any previously interrupted git process
+rm -f .git/index.lock
+
 git add -A
 
 if git --no-optional-locks diff --cached --quiet; then
