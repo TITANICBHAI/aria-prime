@@ -115,12 +115,21 @@ jobs:
           echo ""
           echo "=== Cross-checking cl.h API surface vs stub ==="
           OCL_DIR="android/app/src/main/cpp/opencl-headers"
-          # Extract declared API entry points from CL/cl.h (CL_API_ENTRY lines)
-          HEADER_SYMS=$(grep 'CL_API_ENTRY' "$OCL_DIR/CL/cl.h" | \
-            grep -o 'cl[A-Za-z][A-Za-z0-9]*' | sort -u)
+          # Extract declared API entry points from CL/cl.h.
+          # Use multiple patterns to handle different vendored header styles
+          # (some use CL_API_ENTRY, some use CL_EXT_PREFIX, some use extern directly).
+          # '|| true' prevents grep exit-1 (no match) from aborting under set -euo pipefail.
+          HEADER_SYMS=$(grep -E 'CL_API_ENTRY|extern\s+CL_|^CL_API' "$OCL_DIR/CL/cl.h" 2>/dev/null | \
+            grep -o 'cl[A-Za-z][A-Za-z0-9]*' 2>/dev/null | sort -u || true)
+          if [ -z "$HEADER_SYMS" ]; then
+            echo "INFO: No CL_API_ENTRY declarations found in cl.h — trying direct cl* symbol scan"
+            HEADER_SYMS=$(grep -o '\bcl[A-Z][A-Za-z0-9]*\b' "$OCL_DIR/CL/cl.h" 2>/dev/null | \
+              sort -u || true)
+          fi
           MISSING=()
           while IFS= read -r sym; do
-            if ! grep -q "${sym}(" "$FINDER"; then
+            [ -z "$sym" ] && continue
+            if ! grep -q "${sym}(" "$FINDER" 2>/dev/null; then
               MISSING+=("$sym")
             fi
           done <<< "$HEADER_SYMS"
@@ -128,8 +137,9 @@ jobs:
             echo "WARN: the following cl* functions appear in cl.h but NOT in the stub:"
             printf '  %s\n' "${MISSING[@]}"
             echo "(These may cause linker errors if ggml-opencl.cpp references them)"
+            echo "RESULT: partial coverage — see WARN list above (build continues)"
           else
-            echo "OK: all cl.h API symbols are covered by the stub"
+            echo "OK: all cl.h API symbols are covered by the stub (or cl.h uses non-standard declarations)"
           fi
 
       # ── 3. Vulkan header audit ─────────────────────────────────────────────

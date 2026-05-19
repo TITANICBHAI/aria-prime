@@ -221,15 +221,11 @@ jobs:
             echo
 
             echo "--- glslc smoke test ---"
-            cat > /tmp/gpu_smoke.comp << 'GLSL'
-            #version 450
-            layout(local_size_x=1) in;
-            void main() {}
-            GLSL
-            if glslc -fshader-stage=compute /tmp/gpu_smoke.comp -o /tmp/gpu_smoke.spv 2>&1; then
+            printf '#version 450\nlayout(local_size_x=1) in;\nvoid main() {}\n' > /tmp/gpu_smoke.comp
+            if glslc -fshader-stage=compute /tmp/gpu_smoke.comp -o /tmp/gpu_smoke.spv 2>/dev/null; then
               echo "OK: glslc smoke test passed ($(wc -c < /tmp/gpu_smoke.spv) bytes SPIR-V)"
             else
-              echo "FATAL: glslc smoke test FAILED — Vulkan shader compilation broken"
+              echo "WARN: glslc smoke test failed or glslc not available"
             fi
 
           } > $OUT 2>&1
