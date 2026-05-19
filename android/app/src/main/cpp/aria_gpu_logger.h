@@ -43,7 +43,10 @@
 #ifdef __ANDROID__
 #  include <android/log.h>
 #else
-#  include <stdio.h>   // fprintf, stderr
+// Host compile (CI / unit tests): android/log.h is not available.
+// Provide minimal stubs so the header and its callers compile with plain g++.
+#  include <stdio.h>    // fprintf, stderr, vfprintf
+#  include <stdarg.h>   // va_list, va_start, va_end — MUST come before the inline below
 #  ifndef ANDROID_LOG_VERBOSE
 #    define ANDROID_LOG_VERBOSE 2
 #    define ANDROID_LOG_DEBUG   3
@@ -52,8 +55,7 @@
 #    define ANDROID_LOG_ERROR   6
 #    define ANDROID_LOG_FATAL   7
 #  endif
-// Minimal __android_log_print stub: emits to stderr so host-side tests still
-// produce visible output. The priority integer is printed as a letter prefix.
+// Minimal __android_log_print: writes to stderr so CI output is still visible.
 #  ifndef __android_log_print
 static inline int __android_log_print(int prio, const char* tag,
                                       const char* fmt, ...) {
@@ -68,7 +70,6 @@ static inline int __android_log_print(int prio, const char* tag,
 #  endif
 #endif  // __ANDROID__
 
-#include <stdarg.h>   // va_list (needed for host stub above)
 #include <chrono>
 #include <string>
 
