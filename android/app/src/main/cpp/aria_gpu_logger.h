@@ -36,7 +36,39 @@
 
 #pragma once
 
-#include <android/log.h>
+// ── Android / host-compile portability ───────────────────────────────────────
+// On Android (NDK) we use the real android/log.h. On a Linux host (CI, unit
+// tests) that header is absent, so we provide a lightweight fprintf fallback
+// so that this file compiles cleanly with plain g++/clang++ without the NDK.
+#ifdef __ANDROID__
+#  include <android/log.h>
+#else
+#  include <stdio.h>   // fprintf, stderr
+#  ifndef ANDROID_LOG_VERBOSE
+#    define ANDROID_LOG_VERBOSE 2
+#    define ANDROID_LOG_DEBUG   3
+#    define ANDROID_LOG_INFO    4
+#    define ANDROID_LOG_WARN    5
+#    define ANDROID_LOG_ERROR   6
+#    define ANDROID_LOG_FATAL   7
+#  endif
+// Minimal __android_log_print stub: emits to stderr so host-side tests still
+// produce visible output. The priority integer is printed as a letter prefix.
+#  ifndef __android_log_print
+static inline int __android_log_print(int prio, const char* tag,
+                                      const char* fmt, ...) {
+    const char* level = (prio >= ANDROID_LOG_ERROR) ? "E" :
+                        (prio == ANDROID_LOG_WARN)  ? "W" :
+                        (prio == ANDROID_LOG_DEBUG) ? "D" : "I";
+    fprintf(stderr, "%s/%s: ", level, tag);
+    va_list ap; va_start(ap, fmt); vfprintf(stderr, fmt, ap); va_end(ap);
+    fprintf(stderr, "\n");
+    return 0;
+}
+#  endif
+#endif  // __ANDROID__
+
+#include <stdarg.h>   // va_list (needed for host stub above)
 #include <chrono>
 #include <string>
 

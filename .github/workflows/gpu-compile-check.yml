@@ -198,34 +198,31 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Compiling aria_gpu_logger.h on host ==="
-          # Compile a tiny test TU that includes the header and exercises the
-          # macros + error tables — catches typos/missing #includes before NDK.
-          cat > /tmp/test_gpu_logger.cpp << 'CPP'
-          #include <android/log.h>
-          #define __android_log_print(prio, tag, fmt, ...) ((void)0)
-          #include "aria_gpu_logger.h"
-          int main() {
-              const char* ocl = aria_ocl_error_string(-11);
-              const char* vk  = aria_vk_result_string(-4);
-              const char* ven = aria_vk_vendor_string(0x13B5);
-              const char* dt  = aria_vk_device_type_string(1);
-              ARIA_OCL_INFO("test %s", ocl);
-              ARIA_VK_INFO("test %s", vk);
-              ARIA_GPU_INFO("vendor=%s type=%s", ven, dt);
-              {
-                  GpuPhaseLogger ph("test phase");
-                  ph.milestone("mid-point");
-              }
-              return 0;
-          }
-          CPP
+          # aria_gpu_logger.h guards <android/log.h> with #ifdef __ANDROID__ and
+          # provides its own fprintf fallback, so this compiles on plain g++ without
+          # the NDK. We do NOT include <android/log.h> here; the header handles it.
+          printf '%s\n' \
+            '#include "aria_gpu_logger.h"' \
+            'int main() {' \
+            '    const char* ocl = aria_ocl_error_string(-11);' \
+            '    const char* vk  = aria_vk_result_string(-4);' \
+            '    const char* ven = aria_vk_vendor_string(0x13B5);' \
+            '    const char* dt  = aria_vk_device_type_string(1);' \
+            '    ARIA_OCL_INFO("test %s", ocl);' \
+            '    ARIA_VK_INFO("test %s", vk);' \
+            '    ARIA_GPU_INFO("vendor=%s type=%s", ven, dt);' \
+            '    { GpuPhaseLogger ph("test phase"); ph.milestone("mid-point"); }' \
+            '    return 0;' \
+            '}' \
+            > /tmp/test_gpu_logger.cpp
           g++ -std=c++17 -Wall -Wextra \
               -I android/app/src/main/cpp \
-              -I /usr/include \
               /tmp/test_gpu_logger.cpp \
               -o /tmp/test_gpu_logger \
               -ldl
           echo "OK: aria_gpu_logger.h compiled cleanly on host"
+          /tmp/test_gpu_logger 2>&1 || true
+          echo "OK: host binary ran (exit ignored — stderr output is expected)"
 
       # ── 6. aria_gpu_probe.cpp — host compilation check ────────────────────
       - name: "⑥ aria_gpu_probe.cpp — host compile check (no JNI)"
