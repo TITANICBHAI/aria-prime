@@ -171,11 +171,13 @@ class LearningScheduler(private val context: Context) {
                             // provided by AgentLoop once DqnNetwork is wired into the loop.
                             val stateEmb = FloatArray(DqnNetwork.STATE_DIM) { 0f }
                             DqnNetwork.storeTransition(
-                                state  = stateEmb,
-                                action = 0,
-                                reward = tuple.reward.toFloat(),
-                                next   = stateEmb,
-                                done   = tuple.result != "success"
+                                screenEmb     = stateEmb,
+                                goalEmb       = stateEmb,
+                                action        = 0,
+                                reward        = tuple.reward.toFloat(),
+                                nextScreenEmb = stateEmb,
+                                nextGoalEmb   = stateEmb,
+                                done          = tuple.result != "success"
                             )
                         }
                         repeat(4) { dqnLoss = DqnNetwork.trainStep() }
