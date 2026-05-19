@@ -22,6 +22,8 @@
 // LLAMA_HAS_TRAINING is defined in CMakeLists.txt — the training block below is active.
 // A redundant direct include is NOT needed here; API verified against llama.cpp submodule.
 
+#include "aria_gpu_logger.h"
+
 #define TAG "LlamaJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -120,7 +122,38 @@ Java_com_ariaagent_mobile_core_ai_LlamaEngine_nativeLoadModel(
     bool want_vulkan = (backend_norm == "vulkan") && (n_gpu_layers > 0);
     bool want_opencl = (backend_norm == "opencl") && (n_gpu_layers > 0);
 
+    // ── Enumerate ALL registered GGML backend devices and log each one ────────
+    // This runs on every nativeLoadModel call so a logcat from a failing device
+    // always shows exactly which backends GGML registered — critical when the
+    // user reports "GPU not working" without knowing if the driver is absent.
+    {
+        size_t total_devs = ggml_backend_dev_count();
+        ARIA_GPU_SECTION("GGML backend device registry");
+        ARIA_GPU_INFO("Total registered devices: %zu (requested: '%s' n_gpu_layers=%d)",
+                      total_devs, gpu_backend, n_gpu_layers);
+        for (size_t i = 0; i < total_devs; i++) {
+            ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+            enum ggml_backend_dev_type t = ggml_backend_dev_type(dev);
+            const char* name = ggml_backend_dev_name(dev);
+            const char* desc = ggml_backend_dev_description(dev);
+            const char* type_str =
+                (t == GGML_BACKEND_DEVICE_TYPE_CPU)    ? "CPU" :
+                (t == GGML_BACKEND_DEVICE_TYPE_GPU)    ? "GPU" :
+                (t == GGML_BACKEND_DEVICE_TYPE_ACCEL)  ? "ACCEL" : "UNKNOWN";
+            ARIA_GPU_INFO("  dev[%zu] name='%s' type=%s desc='%s'",
+                          i, name ? name : "(null)", type_str,
+                          desc ? desc : "(null)");
+            // Extra per-backend detail
+            if (name && strstr(name, "Vulkan") != nullptr) {
+                ARIA_VK_INFO("  → Vulkan device registered: '%s'", name);
+            } else if (name && strstr(name, "OpenCL") != nullptr) {
+                ARIA_OCL_INFO("  → OpenCL device registered: '%s'", name);
+            }
+        }
+    }
+
     if (want_vulkan || want_opencl) {
+        GpuPhaseLogger _sel("backend device selection");
         ggml_backend_dev_t cpu_dev = nullptr;
         for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
             ggml_backend_dev_t dev  = ggml_backend_dev_get(i);
@@ -128,27 +161,36 @@ Java_com_ariaagent_mobile_core_ai_LlamaEngine_nativeLoadModel(
             const char* name        = ggml_backend_dev_name(dev);
             if (t == GGML_BACKEND_DEVICE_TYPE_CPU) {
                 cpu_dev = dev;                  // always include CPU as compute fallback
-            } else if (want_vulkan && strstr(name, "Vulkan")  != nullptr) {
+            } else if (want_vulkan && name && strstr(name, "Vulkan") != nullptr) {
                 selected_devices.push_back(dev);
-                LOGI("Backend selected: Vulkan (%s)", name);
-            } else if (want_opencl && strstr(name, "OpenCL") != nullptr) {
+                ARIA_VK_INFO("Selected Vulkan device: '%s'", name);
+            } else if (want_opencl && name && strstr(name, "OpenCL") != nullptr) {
                 selected_devices.push_back(dev);
-                LOGI("Backend selected: OpenCL (%s)", name);
+                ARIA_OCL_INFO("Selected OpenCL device: '%s'", name);
             }
         }
         if (!selected_devices.empty()) {
             if (cpu_dev) selected_devices.push_back(cpu_dev);
             selected_devices.push_back(nullptr);   // null-terminate the list
             mparams.devices = selected_devices.data();
+            ARIA_GPU_INFO("Device list built: %zu GPU device(s) + CPU fallback",
+                          selected_devices.size() - 2);  // -1 null sentinel, -1 cpu
         } else {
-            // Requested backend not found in registry — fall back to default priority
-            LOGI("Backend '%s' not found in registry — using default priority", gpu_backend);
+            // Requested backend found in zero devices — driver missing or not enumerated.
+            ARIA_GPU_WARN("Backend '%s' found NO matching device in GGML registry — "
+                          "driver likely absent; falling back to GGML default priority",
+                          backend_norm.c_str());
         }
     } else {
-        LOGI("GPU backend: %s (n_gpu_layers=%d) — using GGML default priority",
-             gpu_backend, n_gpu_layers);
+        ARIA_GPU_INFO("GPU backend: '%s' (n_gpu_layers=%d) → GGML default priority",
+                      gpu_backend, n_gpu_layers);
     }
 
+    {
+        GpuPhaseLogger _load("model file load");
+        ARIA_GPU_INFO("Loading model: path='%s' n_gpu_layers=%d mmap=%d mlock=%d",
+                      path, n_gpu_layers, (int)mparams.use_mmap, (int)mparams.use_mlock);
+    }
     llama_model* model = llama_model_load_from_file(path, mparams);
 
     // ── GPU → CPU automatic fallback ──────────────────────────────────────────
@@ -165,15 +207,32 @@ Java_com_ariaagent_mobile_core_ai_LlamaEngine_nativeLoadModel(
     // Fix: if the GPU path failed, retry immediately on CPU before crossing back
     // to the JNI boundary.  path is still valid here (released below).
     if (!model && !selected_devices.empty()) {
-        LOGE("GPU backend '%s' failed to load model (driver absent / OOM / no platform) "
-             "— automatic CPU-only fallback", backend_norm.c_str());
+        // Log which backend failed with as much detail as possible
+        if (want_vulkan) {
+            ARIA_VK_ERR(-4 /*VK_ERROR_DEVICE_LOST*/,
+                "Vulkan model load returned nullptr — possible causes:\n"
+                "  1. libvulkan.so present but Mali driver rejected vkDeviceCreate\n"
+                "  2. Insufficient device memory for model weights\n"
+                "  3. Vulkan 1.1 not supported on this device\n"
+                "  4. SPIR-V shader rejected by Mali driver version\n"
+                "  → Retrying on CPU");
+        } else if (want_opencl) {
+            ARIA_OCL_ERR(-5 /*CL_OUT_OF_RESOURCES*/,
+                "OpenCL model load returned nullptr — possible causes:\n"
+                "  1. libOpenCL.so not present at /vendor/lib64/ (run: ls /vendor/lib64/ | grep OpenCL)\n"
+                "  2. clGetPlatformIDs returned 0 platforms (driver installed but not functional)\n"
+                "  3. clBuildProgram failed for a ggml kernel (check on-device OpenCL version >= 2.0)\n"
+                "  4. Insufficient GPU memory for model weights\n"
+                "  → Retrying on CPU");
+        }
+        ARIA_GPU_WARN("GPU load failed — automatic CPU-only fallback initiated");
         mparams.devices      = nullptr;   // let GGML choose the CPU device
         mparams.n_gpu_layers = 0;         // no GPU offload
         model = llama_model_load_from_file(path, mparams);
         if (model) {
-            LOGI("CPU fallback: model loaded successfully — inference will run on CPU");
+            ARIA_GPU_INFO("CPU fallback: model loaded successfully — inference will run on CPU only");
         } else {
-            LOGE("CPU fallback also failed — model file missing or corrupt at: %s", path);
+            ARIA_GPU_ERR("CPU fallback ALSO failed — model file missing or corrupt at: %s", path);
         }
     }
 

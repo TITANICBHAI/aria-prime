@@ -142,6 +142,100 @@ jobs:
           } > $OUT 2>&1
           echo "wrote $OUT ($(wc -l < $OUT) lines)"
 
+      # ── 6b. GPU-specific pre-build diagnostics ────────────────────────────────
+      # Separate from the general environment dump so GPU failures are immediately
+      # identifiable without grepping through 300+ lines of environment output.
+      - name: Diagnostics — GPU backends pre-build
+        if: always()
+        run: |
+          mkdir -p android/build/diagnostics
+          OUT=android/build/diagnostics/01_gpu_environment.txt
+          {
+            echo "============================================================"
+            echo " ARIA GPU backend diagnostics — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "============================================================"
+            echo
+
+            echo "--- OpenCL headers (vendored) ---"
+            OCL_DIR="android/app/src/main/cpp/opencl-headers"
+            if [ -d "$OCL_DIR/CL" ]; then
+              echo "OK: opencl-headers present"
+              echo "Files: $(find "$OCL_DIR/CL" -name "*.h" | wc -l) headers"
+              find "$OCL_DIR/CL" -name "*.h" | sort | xargs -I{} sh -c 'echo "  {} ($(wc -l < {}) lines)"'
+              echo "cl.h size: $(wc -c < $OCL_DIR/CL/cl.h) bytes"
+            else
+              echo "FATAL: opencl-headers/CL/ missing — OpenCL build WILL FAIL"
+            fi
+            echo
+
+            echo "--- FindOpenCL.cmake stub ---"
+            FINDER="android/app/src/main/cpp/FindOpenCL.cmake"
+            if [ -f "$FINDER" ]; then
+              echo "OK: FindOpenCL.cmake present ($(wc -l < $FINDER) lines)"
+              STUB_SYMS=$(grep -o 'cl[A-Za-z][A-Za-z0-9]*(' "$FINDER" | sort -u | wc -l)
+              echo "Stub exports $STUB_SYMS distinct cl* symbols"
+              if [ "$STUB_SYMS" -lt 60 ]; then
+                echo "WARN: expected >= 60 symbols — stub may be incomplete (linker errors likely)"
+              fi
+            else
+              echo "FATAL: FindOpenCL.cmake missing"
+            fi
+            echo
+
+            echo "--- Vulkan headers (host libvulkan-dev) ---"
+            for f in /usr/include/vulkan/vulkan.h \
+                     /usr/include/vulkan/vulkan.hpp \
+                     /usr/include/vulkan/vulkan_core.h; do
+              [ -f "$f" ] && echo "OK: $f" || echo "MISSING: $f"
+            done
+            echo
+
+            echo "--- SPIRV-Headers ---"
+            SPIRV_H="/usr/include/spirv/unified1/spirv.hpp"
+            [ -f "$SPIRV_H" ] \
+              && echo "OK: $SPIRV_H ($(wc -l < $SPIRV_H) lines)" \
+              || echo "FATAL: $SPIRV_H missing — Vulkan backend WILL FAIL"
+            echo
+
+            echo "--- glslc ---"
+            which glslc 2>/dev/null && glslc --version 2>&1 || echo "WARN: glslc not on PATH"
+            echo
+
+            echo "--- aria_gpu_logger.h ---"
+            LOGGER="android/app/src/main/cpp/aria_gpu_logger.h"
+            [ -f "$LOGGER" ] \
+              && echo "OK: $LOGGER ($(wc -l < $LOGGER) lines)" \
+              || echo "MISSING: $LOGGER — GPU logging macros unavailable"
+            echo
+
+            echo "--- aria_gpu_probe.cpp ---"
+            PROBE="android/app/src/main/cpp/aria_gpu_probe.cpp"
+            [ -f "$PROBE" ] \
+              && echo "OK: $PROBE ($(wc -l < $PROBE) lines)" \
+              || echo "MISSING: $PROBE — runtime GPU probe unavailable"
+            echo
+
+            echo "--- CMakeLists.txt GPU flags ---"
+            grep -n 'GGML_VULKAN\|GGML_OPENCL\|GGML_METAL\|GGML_CUDA\|aria_gpu' \
+              android/app/src/main/cpp/CMakeLists.txt | head -20
+            echo
+
+            echo "--- glslc smoke test ---"
+            cat > /tmp/gpu_smoke.comp << 'GLSL'
+            #version 450
+            layout(local_size_x=1) in;
+            void main() {}
+            GLSL
+            if glslc -fshader-stage=compute /tmp/gpu_smoke.comp -o /tmp/gpu_smoke.spv 2>&1; then
+              echo "OK: glslc smoke test passed ($(wc -c < /tmp/gpu_smoke.spv) bytes SPIR-V)"
+            else
+              echo "FATAL: glslc smoke test FAILED — Vulkan shader compilation broken"
+            fi
+
+          } > $OUT 2>&1
+          echo "wrote $OUT ($(wc -l < $OUT) lines)"
+          cat $OUT
+
       # ── 7. Gradle cache ───────────────────────────────────────────────────────
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -265,6 +359,108 @@ jobs:
             fi
           done
 
+          # WARN (not fail) if OpenCL stub is STILL in the APK — it should be excluded
+          # by packagingOptions in build.gradle. If it's present the device will use the
+          # stub at runtime instead of the Mali vendor driver → all inference returns 0.
+          if grep -q 'lib/arm64-v8a/libOpenCL.so' $OUT; then
+            echo "FATAL: libOpenCL.so stub IS present in the APK — it must be excluded!" >&2
+            echo "       Add to build.gradle: packagingOptions { exclude 'lib/*/libOpenCL.so' }" >&2
+            exit 1
+          else
+            echo "OK: libOpenCL.so correctly excluded from APK (runtime will use vendor driver)"
+          fi
+
+      # ── 11b. GPU symbol verification ─────────────────────────────────────────
+      # Inspect the compiled libllama-jni.so to confirm that:
+      #   • Vulkan symbols (ggml_vk_*) are present → Vulkan backend compiled in
+      #   • OpenCL symbols (ggml_cl_*) are present → OpenCL backend compiled in
+      #   • GPU probe symbols are present → nativeProbeGpu() callable from Kotlin
+      #   • libOpenCL.so is listed as an undefined-dynamic dependency (resolved at runtime)
+      - name: Diagnostics — GPU symbol verification
+        if: always()
+        run: |
+          mkdir -p android/build/diagnostics
+          OUT=android/build/diagnostics/25_gpu_symbols.txt
+          {
+            echo "============================================================"
+            echo " ARIA GPU symbol verification — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "============================================================"
+            echo
+
+            NDK_DIR="$ANDROID_SDK_ROOT/ndk/27.1.12297006"
+            NM="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+            READELF="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+            [ -x "$NM" ]      || NM="nm"
+            [ -x "$READELF" ] || READELF="readelf"
+
+            # Find libllama-jni.so (location varies by AGP version)
+            SO=$(find android/app/build -name "libllama-jni.so" -path "*/arm64-v8a/*" 2>/dev/null | head -1)
+            if [ -z "$SO" ]; then
+              SO=$(find android/app/build -name "libllama-jni.so" 2>/dev/null | head -1)
+            fi
+
+            if [ -z "$SO" ] || [ ! -f "$SO" ]; then
+              echo "WARN: libllama-jni.so not found — skipping symbol check (APK build may have failed)"
+            else
+              echo "Inspecting: $SO ($(du -h "$SO" | cut -f1))"
+              echo
+
+              echo "--- Vulkan backend symbols (ggml_vk_* / vulkan) ---"
+              VK_SYMS=$($NM --defined-only "$SO" 2>/dev/null | grep -ci 'ggml_vk\|ggml_vulkan\|vulkan' || echo 0)
+              echo "  Defined Vulkan symbols: $VK_SYMS"
+              $NM --defined-only "$SO" 2>/dev/null | grep -i 'ggml_vk\|ggml_vulkan' | head -10 || true
+              [ "$VK_SYMS" -gt 0 ] \
+                && echo "  STATUS: ✓ Vulkan backend compiled in" \
+                || echo "  STATUS: ✗ NO Vulkan symbols — GGML_VULKAN may not have compiled"
+              echo
+
+              echo "--- OpenCL backend symbols (ggml_cl_* / ggml_opencl) ---"
+              OCL_SYMS=$($NM --defined-only "$SO" 2>/dev/null | grep -ci 'ggml_cl\|ggml_opencl' || echo 0)
+              echo "  Defined OpenCL symbols: $OCL_SYMS"
+              $NM --defined-only "$SO" 2>/dev/null | grep -i 'ggml_cl\|ggml_opencl' | head -10 || true
+              [ "$OCL_SYMS" -gt 0 ] \
+                && echo "  STATUS: ✓ OpenCL backend compiled in" \
+                || echo "  STATUS: ✗ NO OpenCL symbols — GGML_OPENCL may not have compiled"
+              echo
+
+              echo "--- GPU probe symbols (nativeProbeGpu / nativeReprobeGpu) ---"
+              $NM --defined-only "$SO" 2>/dev/null | grep -i 'ProbeGpu\|probe_gpu\|nativeProbeGpu' | head -5 || true
+              PROBE_SYMS=$($NM --defined-only "$SO" 2>/dev/null | grep -ci 'ProbeGpu' || echo 0)
+              [ "$PROBE_SYMS" -gt 0 ] \
+                && echo "  STATUS: ✓ nativeProbeGpu() exported" \
+                || echo "  STATUS: ✗ nativeProbeGpu() missing — aria_gpu_probe.cpp may not have compiled"
+              echo
+
+              echo "--- GPU logger phase symbols (GpuPhaseLogger — expect inlined/absent) ---"
+              $NM "$SO" 2>/dev/null | grep -i 'GpuPhaseLogger\|aria_ocl_error\|aria_vk_result' | head -5 || true
+              echo "  (Absence is normal — logger functions are inlined by -O3)"
+              echo
+
+              echo "--- Dynamic (undefined) symbols: OpenCL + Vulkan runtime deps ---"
+              echo "  (These are resolved from /vendor/lib64/ at runtime on the device)"
+              $NM --dynamic --undefined-only "$SO" 2>/dev/null | \
+                grep -E 'cl[A-Z][a-zA-Z]+|vk[A-Z][a-zA-Z]+' | head -40 || true
+              echo
+
+              echo "--- NEEDED shared libraries (DT_NEEDED) ---"
+              $READELF -d "$SO" 2>/dev/null | grep NEEDED | head -20 || \
+                objdump -p "$SO" 2>/dev/null | grep NEEDED | head -20 || true
+
+              echo
+              echo "--- SUMMARY ---"
+              echo "  Vulkan symbols:    $VK_SYMS"
+              echo "  OpenCL symbols:    $OCL_SYMS"
+              echo "  GPU probe symbols: $PROBE_SYMS"
+              if [ "$VK_SYMS" -gt 0 ] && [ "$OCL_SYMS" -gt 0 ] && [ "$PROBE_SYMS" -gt 0 ]; then
+                echo "  RESULT: ALL GPU backends verified present in libllama-jni.so"
+              else
+                echo "  RESULT: WARNING — one or more GPU backends may be missing"
+              fi
+            fi
+          } > "$OUT" 2>&1
+          echo "wrote $OUT ($(wc -l < $OUT) lines)"
+          cat "$OUT"
+
       # ── 12. Upload APK artifact ───────────────────────────────────────────────
       - name: Upload debug APK
         if: success()
@@ -276,14 +472,16 @@ jobs:
           retention-days: 14
 
       # ── 13. Upload EVERY log we can grab (always — success OR failure) ──────
-      # Greatly expanded vs the previous workflow:
-      #   - .cxx/                              CMake server logs, build_command.txt
-      #   - intermediates/cmake/               per-ABI cmake configure outputs
-      #   - intermediates/incremental/         AGP packaging diffs
-      #   - intermediates/merged_*             merged manifests, resources
-      #   - intermediates/dex/                 DEX merge logs
-      #   - reports/                           lint / test reports
-      #   - diagnostics/                       our new dumps (env, gradle log, APK contents)
+      # Includes GPU-specific logs:
+      #   - diagnostics/01_gpu_environment.txt  — OpenCL/Vulkan pre-build audit
+      #   - diagnostics/25_gpu_symbols.txt      — libllama-jni.so symbol check
+      #   - .cxx/                               CMake server logs, build_command.txt
+      #   - intermediates/cmake/                per-ABI cmake configure outputs
+      #   - intermediates/incremental/          AGP packaging diffs
+      #   - intermediates/merged_*              merged manifests, resources
+      #   - intermediates/dex/                  DEX merge logs
+      #   - reports/                            lint / test reports
+      #   - diagnostics/                        env + GPU + gradle + APK dumps
       #   - kotlin-daemon logs (where present)
       - name: Upload build logs (always)
         if: always()
@@ -303,4 +501,21 @@ jobs:
             android/build/kotlin/
             ~/.gradle/daemon/**/daemon-*.out.log
           retention-days: 14
+          if-no-files-found: ignore
+
+      # ── 14. Upload GPU-specific diagnostics as a standalone artifact ─────────
+      # Kept separate from build-logs so the GPU report is immediately visible
+      # in the Actions UI without downloading the full (often 50+ MB) build-logs.
+      - name: Upload GPU diagnostics (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-diagnostics
+          path: |
+            android/build/diagnostics/01_gpu_environment.txt
+            android/build/diagnostics/25_gpu_symbols.txt
+            android/app/src/main/cpp/aria_gpu_logger.h
+            android/app/src/main/cpp/aria_gpu_probe.cpp
+            android/app/src/main/cpp/FindOpenCL.cmake
+          retention-days: 30
           if-no-files-found: ignore

@@ -42,6 +42,7 @@ set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
 
 set(GGML_VULKAN ON  CACHE BOOL "Vulkan backend — Mali-G72 MP3 Vulkan 1.1 (requires glslc at build time)" FORCE)
 set(GGML_OPENCL ON  CACHE BOOL "OpenCL backend — Mali-G72 MP3 OpenCL 2.0 (runtime-switchable with Vulkan)" FORCE)
+message(STATUS "[ARIA] GPU backends: GGML_VULKAN=${GGML_VULKAN}  GGML_OPENCL=${GGML_OPENCL}")
 set(GGML_METAL  OFF CACHE BOOL "Metal is iOS only" FORCE)
 set(GGML_CUDA   OFF CACHE BOOL "No CUDA on Android" FORCE)
 set(GGML_BLAS   OFF CACHE BOOL "No external BLAS needed for Q4_K_M" FORCE)
@@ -156,6 +157,7 @@ add_library(
     llama_jni.cpp
     aria_math.cpp
     aria_crash_handler.cpp
+    aria_gpu_probe.cpp
 )
 
 target_include_directories(llama-jni PRIVATE
